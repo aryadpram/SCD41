@@ -3,6 +3,7 @@
 #include "SensirionI2CScd4x.h"
 #include <Arduino.h>
 #include <Wire.h>
+#include "CRC8.h"
 
 #define SCD4X_I2C_ADDRESS 0x62
 
@@ -14,50 +15,58 @@ void SensirionI2CScd4x::begin(TwoWire& i2cBus) {
 }
 
 uint16_t SensirionI2CScd4x::startPeriodicMeasurement() {
+    uint8_t command[2] = {0x21, 0xB1};
+
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    Wire.write(0x21);
-    Wire.write(0xB1);
+    Wire.write(command, sizeof(command));
     uint16_t error = Wire.endTransmission();
+    
     delay(1);
+    
     return error;
 }
 
 uint16_t SensirionI2CScd4x::readMeasurementTicks(uint16_t& co2,
                                                  uint16_t& temperature,
                                                  uint16_t& humidity) {
-    uint8_t command[2] = {0xEC, 0x05}; // Command bytes
-    uint8_t buffer[9]; // Buffer to hold received data
-    uint16_t error = 0; // Initialize error variable
+    uint8_t command[2] = {0xEC, 0x05};
+    uint8_t buffer[9];
+    uint16_t error = 0;
 
-    // Send command to the device
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    Wire.write(command, 2); // Send command bytes
+    Wire.write(command, sizeof(command));
     error = Wire.endTransmission();
     if (error) {
-        return error; // Return error if transmission failed
+        return error;
     }
-
-    // Request data from the device
     
-    delay(1); // Wait for the device to process the request
+    delay(1);
 
-    Wire.requestFrom(SCD4X_I2C_ADDRESS, 9); // Request 9 bytes of data
-    if (Wire.available() < 9) {
-        return 3; // Return error if insufficient data received
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
     }
-    for (int i = 0; i < 9; i++) {
-        buffer[i] = Wire.read(); // Read data into buffer
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+    
+    uint8_t crc_co2 = generateCRC(buffer, 2, CRC31_ff);
+    uint8_t crc_temperature = generateCRC(&buffer[3], 2, CRC31_ff);
+    uint8_t crc_humidity = generateCRC(&buffer[6], 2, CRC31_ff);
+
+    if (crc_co2 != buffer[2] || crc_temperature != buffer[5] || crc_humidity != buffer[8]) {
+        return 7;
     }
 
-    // Parse received data
     co2 = (buffer[0] << 8) | buffer[1];
     temperature = (buffer[3] << 8) | buffer[4];
     humidity = (buffer[6] << 8) | buffer[7];
 
-    return error; // Return any transmission error (0 if successful)
+    return error;
 }
 
-uint16_t SensirionI2CScd4x::readMeasurement(uint16_t& co2, float& temperature,
+uint16_t SensirionI2CScd4x::readMeasurement(uint16_t& co2, 
+                                            float& temperature,
                                             float& humidity) {
     uint16_t error;
     uint16_t temperatureTicks;
@@ -74,43 +83,49 @@ uint16_t SensirionI2CScd4x::readMeasurement(uint16_t& co2, float& temperature,
 }
 
 uint16_t SensirionI2CScd4x::stopPeriodicMeasurement() {
+    uint8_t command[2] = {0x3F, 0x86};
+
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    Wire.write(0x3F);
-    Wire.write(0x86);
+    Wire.write(command, sizeof(command));
     uint16_t error = Wire.endTransmission();
+
     delay(500);
+
     return error;
 }
 
 uint16_t SensirionI2CScd4x::getTemperatureOffsetTicks(uint16_t& tOffset) {
-    uint8_t command[2] = {0x23, 0x18}; // Command bytes
-    uint8_t buffer[3]; // Buffer to hold received data
-    uint16_t error = 0; // Initialize error variable
+    uint8_t command[2] = {0x23, 0x18};
+    uint8_t buffer[3];
+    uint16_t error = 0;
 
-    // Send command to the device
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    Wire.write(command, sizeof(command)); // Send command bytes
+    Wire.write(command, sizeof(command));
     error = Wire.endTransmission();
     if (error) {
-        return error; // Return error if transmission failed
+        return error;
     }
-
-    // Request data from the device
     
-    delay(1); // Wait for the device to process the request
+    delay(1);
 
-    Wire.requestFrom(SCD4X_I2C_ADDRESS, 3); // Request 9 bytes of data
-    if (Wire.available() < 3) {
-        return 3; // Return error if insufficient data received
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
     }
-    for (int i = 0; i < 3; i++) {
-        buffer[i] = Wire.read(); // Read data into buffer
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    
     }
 
-    // Parse received data
+    uint8_t crc_tOffset = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc_tOffset != buffer[2]){
+        return 7;
+    }
+
     tOffset = (buffer[0] << 8) | buffer[1];
 
-    return error; // Return any transmission error (0 if successful)
+    return error;
 }
 
 uint16_t SensirionI2CScd4x::getTemperatureOffset(float& tOffset) {
@@ -127,11 +142,15 @@ uint16_t SensirionI2CScd4x::getTemperatureOffset(float& tOffset) {
 }
 
 uint16_t SensirionI2CScd4x::setTemperatureOffsetTicks(uint16_t tOffset) {
+    uint8_t command[5] = {0x24, 0x1D, (tOffset >> 8) & 0xFF, tOffset & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    uint8_t command[4] = {0x24, 0x1D, (tOffset >> 8) & 0xFF, tOffset & 0xFF};
-    Wire.write(command, sizeof(command)); // Send command bytes
-    uint8_t error = Wire.endTransmission();
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
     delay(1);
+
     return error;
 }
 
@@ -142,32 +161,93 @@ uint16_t SensirionI2CScd4x::setTemperatureOffset(float tOffset) {
 }
 
 uint16_t SensirionI2CScd4x::getSensorAltitude(uint16_t& sensorAltitude) {
-    uint8_t command[2] = {0x23, 0x22}; // Command bytes
-    uint8_t buffer[3]; // Buffer to hold received data
-    uint16_t error = 0; // Initialize error variable
+    uint8_t command[2] = {0x23, 0x22};
+    uint8_t buffer[3];
+    uint16_t error = 0;
 
-    // Send command to the device
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
-    Wire.write(command, sizeof(command)); // Send command bytes
+    Wire.write(command, sizeof(command));
     error = Wire.endTransmission();
     if (error) {
-        return error; // Return error if transmission failed
+        return error;
     }
 
-    // Request data from the device
-    
-    delay(1); // Wait for the device to process the request
+    delay(1);
 
-    Wire.requestFrom(SCD4X_I2C_ADDRESS, 3); // Request 9 bytes of data
-    if (Wire.available() < 3) {
-        return 3; // Return error if insufficient data received
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
     }
-    for (int i = 0; i < 3; i++) {
-        buffer[i] = Wire.read(); // Read data into buffer
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
     }
 
-    // Parse received data
+    uint8_t crc_sensorAltitude = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc_sensorAltitude != buffer[2]){
+        return 7;
+    }
+
     sensorAltitude = (buffer[0] << 8) | buffer[1];
 
-    return error; // Return any transmission error (0 if successful)
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::setSensorAltitude(uint16_t sensorAltitude) {
+    uint8_t command[5] = {0x24, 0x27, (sensorAltitude >> 8) & 0xFF, sensorAltitude & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getAmbientPressure(uint16_t& ambientPressure) {
+    uint8_t command[2] = {0xE0, 0x00};
+    uint8_t buffer[3];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+
+    uint8_t crc_ambientPressure = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc_ambientPressure != buffer[2]){
+        return 7;
+    }
+
+    ambientPressure = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::setAmbientPressure(uint16_t ambientPressure) {
+    uint8_t command[5] = {0x24, 0x27, (ambientPressure >> 8) & 0xFF, ambientPressure & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    return error;
 }

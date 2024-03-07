@@ -17,8 +17,11 @@ class SensirionI2CScd4x {
     uint16_t setTemperatureOffsetTicks(uint16_t tOffset);
     uint16_t setTemperatureOffset(float tOffset);
     uint16_t getSensorAltitude(uint16_t& sensorAltitude);
+    uint16_t setSensorAltitude(uint16_t sensorAltitude);
+    uint16_t getAmbientPressure(uint16_t &ambientPressure);
+    uint16_t setAmbientPressure(uint16_t ambientPressure);
 
-  private:
+private:
     TwoWire* _i2cBus = nullptr;
 };
 

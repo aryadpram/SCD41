@@ -22,6 +22,10 @@ void loop() {
   float temperature = 0.0f;
   float humidity = 0.0f;
   error = scd4x.readMeasurement(co2, temperature, humidity);
+  if (error){
+    Serial.print(error);
+    return;
+  }
   Serial.print("Co2:");
   Serial.print(co2);
   Serial.print("\t");
@@ -30,5 +34,5 @@ void loop() {
   Serial.print("\t");
   Serial.print("Humidity:");
   Serial.println(humidity);
-  delay(5000);
+  delay(4000);
 }
