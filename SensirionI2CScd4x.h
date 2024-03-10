@@ -18,8 +18,25 @@ class SensirionI2CScd4x {
     uint16_t setTemperatureOffset(float tOffset);
     uint16_t getSensorAltitude(uint16_t& sensorAltitude);
     uint16_t setSensorAltitude(uint16_t sensorAltitude);
-    uint16_t getAmbientPressure(uint16_t &ambientPressure);
+    uint16_t getAmbientPressure(uint16_t& ambientPressure);
     uint16_t setAmbientPressure(uint16_t ambientPressure);
+    uint16_t performForcedRecalibration(uint16_t targetCo2Concentration, uint16_t &frcCorrection);
+    uint16_t SensirionI2CScd4x::getAutomaticSelfCalibration(uint16_t& ascEnabled);
+    uint16_t SensirionI2CScd4x::setAutomaticSelfCalibration(uint16_t ascEnabled) ;
+    uint16_t SensirionI2CScd4x::getAutomaticSelfCalibrationInitialPeriod(uint16_t& ascInitialPeriod) ;
+    uint16_t SensirionI2CScd4x::setAutomaticSelfCalibrationInitialPeriod(uint16_t& ascInitialPeriod) ;
+    uint16_t SensirionI2CScd4x::getAutomaticSelfCalibrationStandardPeriod(uint16_t& ascStandardPeriod) ;
+    uint16_t SensirionI2CScd4x::setAutomaticSelfCalibrationStandardPeriod(uint16_t& ascStandardPeriod) ;
+    uint16_t SensirionI2CScd4x::getDataReadyFlag(bool& dataReady) ;
+    uint16_t SensirionI2CScd4x::persistSettings() ;
+    uint16_t SensirionI2CScd4x::getSerialNumber(uint16_t& serial0, uint16_t& serial1, uint16_t& serial2) ;
+    uint16_t SensirionI2CScd4x::performSelfTest(uint16_t& sensorStatus) ;
+    uint16_t SensirionI2CScd4x::performFactoryReset() ;
+    uint16_t SensirionI2CScd4x::reinit() ;
+    uint16_t SensirionI2CScd4x::measureSingleShot() ;
+    uint16_t SensirionI2CScd4x::measureSingleShotRhtOnly() ;
+    uint16_t SensirionI2CScd4x::powerDown() ;
+    uint16_t SensirionI2CScd4x::wakeUp() ;
 
 private:
     TwoWire* _i2cBus = nullptr;

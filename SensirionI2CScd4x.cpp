@@ -16,6 +16,7 @@ void SensirionI2CScd4x::begin(TwoWire& i2cBus) {
 
 uint16_t SensirionI2CScd4x::startPeriodicMeasurement() {
     uint8_t command[2] = {0x21, 0xB1};
+    uint16_t error = 0;
 
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
     Wire.write(command, sizeof(command));
@@ -68,7 +69,7 @@ uint16_t SensirionI2CScd4x::readMeasurementTicks(uint16_t& co2,
 uint16_t SensirionI2CScd4x::readMeasurement(uint16_t& co2, 
                                             float& temperature,
                                             float& humidity) {
-    uint16_t error;
+    uint16_t error = 0;
     uint16_t temperatureTicks;
     uint16_t humidityTicks;
 
@@ -117,9 +118,9 @@ uint16_t SensirionI2CScd4x::getTemperatureOffsetTicks(uint16_t& tOffset) {
     
     }
 
-    uint8_t crc_tOffset = generateCRC(buffer, 2, CRC31_ff);
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
 
-    if (crc_tOffset != buffer[2]){
+    if (crc != buffer[2]){
         return 7;
     }
 
@@ -129,8 +130,8 @@ uint16_t SensirionI2CScd4x::getTemperatureOffsetTicks(uint16_t& tOffset) {
 }
 
 uint16_t SensirionI2CScd4x::getTemperatureOffset(float& tOffset) {
-    uint16_t error;
     uint16_t tOffsetTicks;
+    uint16_t error = 0;
 
     error = getTemperatureOffsetTicks(tOffsetTicks);
     if (error) {
@@ -144,6 +145,7 @@ uint16_t SensirionI2CScd4x::getTemperatureOffset(float& tOffset) {
 uint16_t SensirionI2CScd4x::setTemperatureOffsetTicks(uint16_t tOffset) {
     uint8_t command[5] = {0x24, 0x1D, (tOffset >> 8) & 0xFF, tOffset & 0xFF, 0};
     command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
 
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
     Wire.write(command, sizeof(command));
@@ -182,9 +184,9 @@ uint16_t SensirionI2CScd4x::getSensorAltitude(uint16_t& sensorAltitude) {
         buffer[i] = Wire.read();
     }
 
-    uint8_t crc_sensorAltitude = generateCRC(buffer, 2, CRC31_ff);
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
 
-    if (crc_sensorAltitude != buffer[2]){
+    if (crc != buffer[2]){
         return 7;
     }
 
@@ -196,6 +198,7 @@ uint16_t SensirionI2CScd4x::getSensorAltitude(uint16_t& sensorAltitude) {
 uint16_t SensirionI2CScd4x::setSensorAltitude(uint16_t sensorAltitude) {
     uint8_t command[5] = {0x24, 0x27, (sensorAltitude >> 8) & 0xFF, sensorAltitude & 0xFF, 0};
     command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
 
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
     Wire.write(command, sizeof(command));
@@ -228,9 +231,9 @@ uint16_t SensirionI2CScd4x::getAmbientPressure(uint16_t& ambientPressure) {
         buffer[i] = Wire.read();
     }
 
-    uint8_t crc_ambientPressure = generateCRC(buffer, 2, CRC31_ff);
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
 
-    if (crc_ambientPressure != buffer[2]){
+    if (crc != buffer[2]){
         return 7;
     }
 
@@ -242,6 +245,7 @@ uint16_t SensirionI2CScd4x::getAmbientPressure(uint16_t& ambientPressure) {
 uint16_t SensirionI2CScd4x::setAmbientPressure(uint16_t ambientPressure) {
     uint8_t command[5] = {0x24, 0x27, (ambientPressure >> 8) & 0xFF, ambientPressure & 0xFF, 0};
     command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
 
     Wire.beginTransmission(SCD4X_I2C_ADDRESS);
     Wire.write(command, sizeof(command));
@@ -250,4 +254,373 @@ uint16_t SensirionI2CScd4x::setAmbientPressure(uint16_t ambientPressure) {
     delay(1);
 
     return error;
+}
+
+uint16_t SensirionI2CScd4x::performForcedRecalibration(uint16_t targetCo2Concentration,
+                                                        uint16_t& frcCorrection) {
+    uint8_t command[5] = {0x24, 0x27, (targetCo2Concentration >> 8) & 0xFF, targetCo2Concentration & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(400);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    frcCorrection = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getAutomaticSelfCalibration(uint16_t& ascEnabled) {
+    uint8_t command[2] = {0x23, 0x13};
+    uint8_t buffer[3];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    ascEnabled = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::setAutomaticSelfCalibration(uint16_t ascEnabled) {
+    uint8_t command[5] = {0x24, 0x16, (ascEnabled >> 8) & 0xFF, ascEnabled & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getAutomaticSelfCalibrationInitialPeriod(uint16_t& ascInitialPeriod) {
+    uint8_t command[2] = {0x23, 0x40};
+    uint8_t buffer[3];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    ascInitialPeriod = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::setAutomaticSelfCalibrationInitialPeriod(uint16_t& ascInitialPeriod) {
+    uint8_t command[5] = {0x24, 0x45, (ascInitialPeriod >> 8) & 0xFF, ascInitialPeriod & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getAutomaticSelfCalibrationStandardPeriod(uint16_t& ascStandardPeriod) {
+    uint8_t command[2] = {0x23, 0x4B};
+    uint8_t buffer[3];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    ascStandardPeriod = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::setAutomaticSelfCalibrationStandardPeriod(uint16_t& ascStandardPeriod) {
+    uint8_t command[5] = {0x24, 0x4E, (ascStandardPeriod >> 8) & 0xFF, ascStandardPeriod & 0xFF, 0};
+    command[4] = generateCRC(&command[2], 2, CRC31_ff);
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getDataReadyFlag(bool& dataReady) {
+    uint8_t command[2] = {0xE4, 0xB8}
+    uint16_t localDataReady = 0;
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    localDataReady = (buffer[0] << 8) | buffer[1];
+    dataReady = (localDataReady & 0x07FF) != 0;
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::persistSettings() {
+    uint8_t command[2] = {0x36, 0x15};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(800);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::getSerialNumber(uint16_t& serial0,
+                                            uint16_t& serial1,
+                                            uint16_t& serial2) {
+    uint8_t command[2] = {0x36, 0x82};
+    uint8_t buffer[9];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(1);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    }
+    
+    uint8_t crc_serial0 = generateCRC(buffer, 2, CRC31_ff);
+    uint8_t crc_serial1 = generateCRC(&buffer[3], 2, CRC31_ff);
+    uint8_t crc_serial2 = generateCRC(&buffer[6], 2, CRC31_ff);
+
+    if (crc_serial0 != buffer[2] || crc_serial1 != buffer[5] || crc_serial2 != buffer[8]) {
+        return 7;
+    }
+
+    serial0 = (buffer[0] << 8) | buffer[1];
+    serial1 = (buffer[3] << 8) | buffer[4];
+    serial2 = (buffer[6] << 8) | buffer[7];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::performSelfTest(uint16_t& sensorStatus) {
+    uint8_t command[2] = {0x36, 0x39};
+    uint8_t buffer[3];
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    error = Wire.endTransmission();
+    if (error) {
+        return error;
+    }
+    
+    delay(10000);
+
+    Wire.requestFrom(SCD4X_I2C_ADDRESS, sizeof(buffer));
+    if (Wire.available() < sizeof(buffer)) {
+        return 6;
+    }
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = Wire.read();
+    
+    }
+
+    uint8_t crc = generateCRC(buffer, 2, CRC31_ff);
+
+    if (crc != buffer[2]){
+        return 7;
+    }
+
+    sensorStatus = (buffer[0] << 8) | buffer[1];
+
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::performFactoryReset() {
+    uint8_t command[2] = {0x36, 0x32};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(800);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::reinit() {
+    uint8_t command[2] = {0x36, 0x46};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(20);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::measureSingleShot() {
+    uint8_t command[2] = {0x21, 0x9D};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(5000);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::measureSingleShotRhtOnly() {
+    uint8_t command[2] = {0x21, 0x96};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(50);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::powerDown() {
+    uint8_t command[2] = {0x36, 0xE0};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission();
+    
+    delay(1);
+    
+    return error;
+}
+
+uint16_t SensirionI2CScd4x::wakeUp() {
+    uint8_t command[2] = {0x36, 0xF6};
+    uint16_t error = 0;
+
+    Wire.beginTransmission(SCD4X_I2C_ADDRESS);
+    Wire.write(command, sizeof(command));
+    uint16_t error = Wire.endTransmission(); //error is igonred since the sensor doesnt acknolwedge the wake up call
+    
+    delay(1);
+
+    return 0;
 }
