@@ -2,6 +2,7 @@
 #define SENSIRIONI2CSCD4X_H
 
 #include <Wire.h>
+#include <string>
 
 class SensirionI2CScd4x {
 
@@ -38,8 +39,23 @@ class SensirionI2CScd4x {
     uint16_t powerDown() ;
     uint16_t wakeUp() ;
 
+    ~SensirionI2CScd4x();
+    void startRollingTWAMeasurement();
+    uint16_t updateRollingTWAAccumulation();
+    float getRollingTWACO2();
+
 private:
     TwoWire* _i2cBus = nullptr;
+
+    static const uint16_t MAX_READINGS = 5760; // Max readings in 8 hours (1 reading per 5 seconds)
+    uint16_t* _co2Readings;
+    uint16_t _readingCount;
+    uint16_t _readingIndex;
+    uint32_t _lastReadingTime;
+    uint32_t _runningSum;
+    bool _dataReady;
+
+    static uint32_t elapsedTime(uint32_t start, uint32_t end);
 };
 
 #endif /* SENSIRIONI2CSCD4X_H */

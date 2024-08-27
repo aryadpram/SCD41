@@ -8,6 +8,7 @@
 #define SCD4X_I2C_ADDRESS 0x62
 
 SensirionI2CScd4x::SensirionI2CScd4x() {
+    _co2Readings = new uint16_t[MAX_READINGS];
 }
 
 void SensirionI2CScd4x::begin(TwoWire& i2cBus) {
@@ -244,7 +245,7 @@ uint16_t SensirionI2CScd4x::getAmbientPressure(uint16_t& ambientPressure) {
 }
 
 uint16_t SensirionI2CScd4x::setAmbientPressure(uint16_t ambientPressure) {
-    uint8_t command[5] = {0x24, 0x27, (ambientPressure >> 8) & 0xFF, ambientPressure & 0xFF, 0};
+    uint8_t command[5] = {0xE0, 0x00, (ambientPressure >> 8) & 0xFF, ambientPressure & 0xFF, 0};
     command[4] = generateCRC(&command[2], 2, CRC31_ff);
     uint16_t error = 0;
 
@@ -626,4 +627,93 @@ uint16_t SensirionI2CScd4x::wakeUp() {
     delay(1);
 
     return 0;
+}
+
+// std::string SensirionI2CScd4x::co2Standard() {
+//     uint16_t co2 = 0;
+//     uint16_t error = 0;
+//     uint16_t temperatureTicks;
+//     uint16_t humidityTicks;
+//     uint16_t outdoorCO2 = 400;
+
+//     error = readMeasurementTicks(co2, temperatureTicks, humidityTicks);
+//     if (error) {
+//         return "Error reading measurement (Code: " + std::to_string(error) + ")";
+//     }
+
+//     if (co2 <= outdoorCO2 + 400) {
+//         return "IDA 1: Very High Indoor Air Quality (CO2 Level: " + std::to_string(co2) + " ppm)";
+//     } else if (co2 <= outdoorCO2 + 600) {
+//         return "IDA 2: Medium Indoor Air Quality (CO2 Level: " + std::to_string(co2) + " ppm)";
+//     } else if (co2 <= outdoorCO2 + 1000) {
+//         return "IDA 3: Moderate Indoor Air Quality (CO2 Level: " + std::to_string(co2) + " ppm)";
+//     } else {
+//         return "IDA 4: Low Indoor Air Quality (CO2 Level: " + std::to_string(co2) + " ppm)";
+//     }
+// }
+
+SensirionI2CScd4x::~SensirionI2CScd4x() {
+    delete[] _co2Readings;
+}
+
+void SensirionI2CScd4x::startRollingTWAMeasurement() {
+    _readingCount = 0;
+    _readingIndex = 0;
+    _lastReadingTime = millis();
+    _runningSum = 0;  // Initialize running sum
+}
+
+uint32_t SensirionI2CScd4x::elapsedTime(uint32_t start, uint32_t end) {
+    return (end >= start) ? (end - start) : (UINT32_MAX - start + end + 1);
+}
+
+uint16_t SensirionI2CScd4x::updateRollingTWAAccumulation() {
+    uint32_t currentTime = millis();
+    
+    // Check if 5 seconds have passed since the last reading
+    if (elapsedTime(_lastReadingTime, currentTime) >= 5000) {
+        // Check if data is ready
+        uint16_t error = getDataReadyFlag(_dataReady);
+        
+        if (error != 0) {
+            _lastReadingTime = currentTime;
+            return error; // Return error from getDataReadyFlag
+        }
+
+        if (_dataReady) {
+            uint16_t co2;
+            float temperature, humidity;
+            error = readMeasurement(co2, temperature, humidity);
+            
+            if (error == 0) {
+                if (_readingCount == MAX_READINGS) {
+                    // If we're at max capacity, subtract the oldest reading
+                    _runningSum -= _co2Readings[_readingIndex];
+                } else {
+                    _readingCount++;
+                }
+                
+                // Add the new reading
+                _co2Readings[_readingIndex] = co2;
+                _runningSum += co2;
+                
+                _readingIndex = (_readingIndex + 1) % MAX_READINGS;
+            } else {
+                _lastReadingTime = currentTime;
+                return error; // Return error from readMeasurement
+            }
+        }
+        
+        _lastReadingTime = currentTime;
+    }
+
+    return 0;
+}
+
+float SensirionI2CScd4x::getRollingTWACO2() {
+    if (_readingCount == 0) {
+        return 0; // Return 0 if no readings have been taken
+    }
+
+    return (float)_runningSum / _readingCount;
 }
