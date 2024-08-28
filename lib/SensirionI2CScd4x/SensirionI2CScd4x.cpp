@@ -654,66 +654,45 @@ uint16_t SensirionI2CScd4x::wakeUp() {
 
 SensirionI2CScd4x::~SensirionI2CScd4x() {
     delete[] _co2Readings;
+    delete[] _timestamps;
 }
 
 void SensirionI2CScd4x::startRollingTWAMeasurement() {
+    _co2Readings = new uint16_t[MAX_READINGS];
+    _timestamps = new uint32_t[MAX_READINGS];
     _readingCount = 0;
     _readingIndex = 0;
-    _lastReadingTime = millis();
-    _runningSum = 0;  // Initialize running sum
+    _runningSum = 0;
+    _sumOfWeights = 0;
 }
+
 
 uint32_t SensirionI2CScd4x::elapsedTime(uint32_t start, uint32_t end) {
     return (end >= start) ? (end - start) : (UINT32_MAX - start + end + 1);
 }
 
-uint16_t SensirionI2CScd4x::updateRollingTWAAccumulation() {
-    uint32_t currentTime = millis();
-    
-    // Check if 5 seconds have passed since the last reading
-    if (elapsedTime(_lastReadingTime, currentTime) >= 5000) {
-        // Check if data is ready
-        uint16_t error = getDataReadyFlag(_dataReady);
-        
-        if (error != 0) {
-            _lastReadingTime = currentTime;
-            return error; // Return error from getDataReadyFlag
-        }
+void SensirionI2CScd4x::updateRollingTWAAccumulation(uint16_t co2, uint32_t timestamp) {
+    uint32_t timeDiff = elapsedTime(_timestamps[_readingIndex], timestamp);
 
-        if (_dataReady) {
-            uint16_t co2;
-            float temperature, humidity;
-            error = readMeasurement(co2, temperature, humidity);
-            
-            if (error == 0) {
-                if (_readingCount == MAX_READINGS) {
-                    // If we're at max capacity, subtract the oldest reading
-                    _runningSum -= _co2Readings[_readingIndex];
-                } else {
-                    _readingCount++;
-                }
-                
-                // Add the new reading
-                _co2Readings[_readingIndex] = co2;
-                _runningSum += co2;
-                
-                _readingIndex = (_readingIndex + 1) % MAX_READINGS;
-            } else {
-                _lastReadingTime = currentTime;
-                return error; // Return error from readMeasurement
-            }
-        }
-        
-        _lastReadingTime = currentTime;
+    if (_readingCount == MAX_READINGS) {
+        _runningSum -= _co2Readings[_readingIndex] * (timestamp - _timestamps[_readingIndex]);
+        _sumOfWeights -= timeDiff;
+    } else {
+        _readingCount++;
     }
 
-    return 0;
+    _co2Readings[_readingIndex] = co2;
+    _timestamps[_readingIndex] = timestamp;
+    _runningSum += co2 * timeDiff;
+    _sumOfWeights += timeDiff;
+
+    _readingIndex = (_readingIndex + 1) % MAX_READINGS;
 }
 
-float SensirionI2CScd4x::getRollingTWACO2() {
-    if (_readingCount == 0) {
-        return 0; // Return 0 if no readings have been taken
+uint16_t SensirionI2CScd4x::getRollingTWACO2() const {
+    if (_readingCount == 0 || _sumOfWeights == 0) {
+        return 0;  // Return 0 if no readings have been taken
     }
 
-    return (float)_runningSum / _readingCount;
+    return static_cast<uint16_t>(_runningSum) / _sumOfWeights;
 }

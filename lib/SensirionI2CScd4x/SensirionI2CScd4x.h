@@ -40,20 +40,20 @@ class SensirionI2CScd4x {
     uint16_t wakeUp() ;
 
     ~SensirionI2CScd4x();
-    void startRollingTWAMeasurement();
-    uint16_t updateRollingTWAAccumulation();
-    float getRollingTWACO2();
+    void startRollingTWAMeasurement(); // Initializes the TWA measurement
+    void updateRollingTWAAccumulation(uint16_t co2, uint32_t timestamp); // Updates the TWA calculation with new CO2 reading and timestamp
+    uint16_t getRollingTWACO2() const; // Returns the current TWA of CO2 concentration
 
 private:
     TwoWire* _i2cBus = nullptr;
 
-    static const uint16_t MAX_READINGS = 5760; // Max readings in 8 hours (1 reading per 5 seconds)
-    uint16_t* _co2Readings;
-    uint16_t _readingCount;
-    uint16_t _readingIndex;
-    uint32_t _lastReadingTime;
-    uint32_t _runningSum;
-    bool _dataReady;
+    static const uint32_t MAX_READINGS = 5760; // Max readings in 8 hours (1 reading per 5 seconds)
+    uint16_t* _co2Readings;       // Array to store CO2 readings
+    uint32_t* _timestamps;        // Array to store timestamps of each reading
+    uint32_t _readingCount;       // Number of readings taken
+    uint32_t _readingIndex;       // Current index in the readings array
+    uint32_t _runningSum;         // Sum of the CO2 readings
+    uint32_t _sumOfWeights;       // Sum of the weights (time differences)
 
     static uint32_t elapsedTime(uint32_t start, uint32_t end);
 };
