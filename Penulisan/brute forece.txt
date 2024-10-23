@@ -1,0 +1,108 @@
+#include <Wire.h>
+#include <Arduino.h>
+
+#define SCD4X_ADDRESS 0x62
+
+// Known register addresses
+const uint16_t knownAddresses[] = {
+    0xec05, 0x2318, 0x2322, 0xe000, 0x2313, 0xe4b8,
+    0x3682, 0x3639, 0x2340, 0x234b, 0x21b1, 0x3f86,
+    0x21ac, 0x3615, 0x3632, 0x3646, 0x219d, 0x2196,
+    0x36e0, 0x36f6, 0x362f, 0x241d, 0x2427, 0x2445,
+    0x244e
+};
+const size_t numKnownAddresses = sizeof(knownAddresses) / sizeof(knownAddresses[0]);
+
+// Function declarations
+void scanAddresses(uint16_t startAddress, uint16_t endAddress);
+void scanSingleAddress(uint16_t address);
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+
+  Serial.println("Writing data to 0xE000 and scanning prioritized addresses...");
+
+  // Write value (997) to register 0xE000
+  uint16_t valueToWrite = 997;
+  Wire.beginTransmission(SCD4X_ADDRESS);
+  Wire.write(0xE000 >> 8);   // High byte of address
+  Wire.write(0xE000 & 0xFF); // Low byte of address
+  Wire.write(valueToWrite >> 8); // High byte of value
+  Wire.write(valueToWrite & 0xFF); // Low byte of value
+  if (Wire.endTransmission() == 0) {
+    Serial.println("Successfully wrote to register 0xE000.");
+  } else {
+    Serial.println("Error writing to register 0xE000.");
+  }
+
+  // // Scan addresses starting with 0x2
+  // Serial.println("Scanning addresses starting with 0x2...");
+  // scanAddresses(0x2000, 0x2FFF);
+
+  // // Scan addresses starting with 0x3
+  // Serial.println("Scanning addresses starting with 0x3...");
+  // scanAddresses(0x3000, 0x3FFF);
+
+  // Scan all other addresses
+  Serial.println("Scanning all other addresses...");
+  for (uint16_t address = 0x0000; address <= 0xFFFF; address++) {
+    if ((address & 0xF000) == 0x2000 || (address & 0xF000) == 0x3000) {
+      continue; // Skip addresses already scanned
+    }
+
+    scanSingleAddress(address);
+  }
+}
+
+void scanAddresses(uint16_t startAddress, uint16_t endAddress) {
+  for (uint16_t address = startAddress; address <= endAddress; address++) {
+    bool isKnown = false;
+    for (size_t i = 0; i < numKnownAddresses; i++) {
+      if (address == knownAddresses[i]) {
+        isKnown = true;
+        break;
+      }
+    }
+
+    if (isKnown) continue;
+
+    scanSingleAddress(address);
+    delay(10); // Short delay to prevent bus issues
+  }
+}
+
+void scanSingleAddress(uint16_t address) {
+  Wire.beginTransmission(SCD4X_ADDRESS);
+  Wire.write(address >> 8);   // High byte of address
+  Wire.write(address & 0xFF); // Low byte of address
+  Wire.endTransmission();
+
+  Wire.requestFrom(SCD4X_ADDRESS, 3);
+  
+  if (Wire.available() == 3) {
+    uint16_t readValue = (Wire.read() << 8) | Wire.read();  // Read first two bytes
+    uint8_t thirdByte = Wire.read(); // Read third byte
+
+    if (readValue == 997) {
+      Serial.print("Address 0x");
+      Serial.print(address, HEX);
+      Serial.print(" - Read Value: 0x");
+      Serial.print(readValue, HEX);
+      Serial.print(" (Decimal: ");
+      Serial.print(readValue, DEC);
+      Serial.print(") - Third Byte: 0x");
+      Serial.println(thirdByte, HEX);
+      return;
+    }
+  } else {
+    Serial.print("Address 0x");
+    Serial.print(address, HEX);
+    Serial.println(" - No data available");
+  }
+}
+
+void loop() {
+  // No continuous actions needed
+  delay(5000);
+}

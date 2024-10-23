@@ -1,0 +1,68 @@
+#include Arduino.h
+#include SensirionI2CScd4x.h
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin();
+  scd4x.begin(Wire);
+
+   Start periodic measurement
+  scd4x.startPeriodicMeasurement();
+  delay(5000);  Wait for 5 seconds to get the first measurement
+
+   Get and print the first measurement
+  bool isDataReady = false;
+  scd4x.getDataReadyFlag(isDataReady);
+
+  if (isDataReady) {
+    uint16_t co2;
+    float temperature, humidity;
+    scd4x.readMeasurement(co2, temperature, humidity);
+    Serial.printf(CO2 %d ppm, Temperature %.2f °C, Humidity %.2f %%n, co2, temperature, humidity);
+  } else {
+    Serial.println(Data not ready.);
+  }
+
+   Stop periodic measurement before setting the pressure
+  scd4x.stopPeriodicMeasurement();
+  Serial.println(Periodic measurement stopped.);
+
+   Set pressure to a valid value within uint16_t range
+  scd4x.setAmbientPressure(997);  Example value in hPa
+  Serial.println(Pressure set to 997 hPa.);
+
+   Restart periodic measurement to get the new measurement
+  scd4x.startPeriodicMeasurement();
+  delay(5000);  Wait for 5 seconds to get the new measurement
+
+   Retrieve and print the current pressure
+  uint16_t pressure;
+  uint16_t error = scd4x.getAmbientPressure(pressure);  Call the function
+  if (error) {
+    Serial.print(Error retrieving pressure );
+    Serial.println(error);
+  } else {
+    Serial.printf(Current Pressure %d hPan, pressure);
+  }
+}
+
+void loop() {
+  bool isDataReady = false;
+
+   Check if data is ready after setting the pressure
+  scd4x.getDataReadyFlag(isDataReady);
+
+  if (isDataReady) {
+    uint16_t co2;
+    float temperature, humidity;
+    scd4x.readMeasurement(co2, temperature, humidity);
+    Serial.printf(New Measurement - CO2 %d ppm, Temperature %.2f °C, Humidity %.2f %%n, co2, temperature, humidity);
+  } else {
+    Serial.println(Data not ready after setting pressure.);
+  }
+
+  delay(5000);  Check every 2 seconds
+}

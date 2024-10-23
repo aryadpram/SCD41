@@ -1,0 +1,85 @@
+#include <Arduino.h>
+#include "SensirionI2CScd4x.h"
+#include <SDFat.h>
+#include <RTClib.h>
+
+SensirionI2CScd4x scd4x;
+SdFat32 sd;
+File32 file;
+RTC_DS3231 rtc;
+
+// Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
+#define SPI_CLOCK SD_SCK_MHZ(8)
+
+#define SD_CS_PIN 5
+
+// Try to select the best SD card configuration.
+#if HAS_SDIO_CLASS
+#define SD_CONFIG SdioConfig(FIFO_SDIO)
+#elif ENABLE_DEDICATED_SPI
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
+#else  // HAS_SDIO_CLASS
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK)
+#endif  // HAS_SDIO_CLASS
+
+unsigned long previousMillis = 0;   // Store the last time the sensor data was published
+unsigned long interval = 3000;       // Interval at which to publish data (5 sec)
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin();
+  scd4x.begin(Wire);
+
+  uint16_t error;
+  error = scd4x.stopPeriodicMeasurement();
+  if (error) {
+      Serial.print("Error trying to execute stopPeriodicMeasurement(): ");
+      Serial.println(error);
+  }
+  error = scd4x.startPeriodicMeasurement();
+  if (error) {
+      Serial.print("Error trying to execute startPeriodicMeasurement(): ");
+      Serial.println(error);
+  }
+
+  rtc.begin();
+  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+  sd.begin(SD_CONFIG);
+
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    uint16_t error;
+    uint16_t co2 = 0;
+    float temperature = 0.0f;
+    float humidity = 0.0f;
+    bool isDataReady = false;
+
+    error = scd4x.getDataReadyFlag(isDataReady);
+    if (error) {
+        Serial.print("Error trying to execute getDataReadyFlag(): ");
+        Serial.println(error);
+        return;
+    }
+    if (!isDataReady) {
+        return;
+    }
+
+    error = scd4x.readMeasurement(co2, temperature, humidity);
+    
+    DateTime timestamp = rtc.now();
+    String csvData = timestamp.timestamp() + ", " + String(co2) + ", " + String(temperature) + ", " + String(humidity);
+
+    file.open("data.csv", FILE_WRITE);
+    file.println(csvData);
+    file.close();
+    Serial.println(csvData);
+
+    }
+  }

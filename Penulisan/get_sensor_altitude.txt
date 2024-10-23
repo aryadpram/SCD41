@@ -1,0 +1,44 @@
+#include <Arduino.h>
+#include "SensirionI2CScd4x.h"
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  scd4x.begin(Wire);
+
+  // Stop periodic measurement before setting the altitude
+  uint16_t error = scd4x.stopPeriodicMeasurement();
+  if (error) {
+    Serial.print("Error stopping periodic measurement: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Periodic measurement stopped.");
+  }
+
+  // Set altitude to a valid value (e.g., 500 meters)
+  uint16_t altitudeToSet = 137; // Example value in meters
+  error = scd4x.setSensorAltitude(altitudeToSet);
+  if (error) {
+    Serial.print("Error setting altitude: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Altitude set successfully.");
+  }
+
+  // Retrieve and print the current altitude
+  uint16_t sensorAltitude;
+  error = scd4x.getSensorAltitude(sensorAltitude);
+  if (error) {
+    Serial.print("Error retrieving altitude: ");
+    Serial.println(error);
+  } else {
+    Serial.printf("Current Altitude: %d meters\n", sensorAltitude);
+  }
+}
+
+void loop() {
+  // No continuous actions needed for this example
+  delay(10000); // Delay to prevent continuous printing
+}

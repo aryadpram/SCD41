@@ -1,0 +1,62 @@
+#include <Arduino.h>
+#include "SensirionI2CScd4x.h"
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  scd4x.begin(Wire);
+
+  // Retrieve and print the current altitude
+  uint16_t sensorAltitude;
+  uint16_t error = scd4x.getSensorAltitude(sensorAltitude);
+  if (error) {
+    Serial.print("Error retrieving current altitude: ");
+    Serial.println(error);
+  } else {
+    Serial.printf("Current Altitude: %d meters\n", sensorAltitude);
+  }
+
+  // Set a new altitude value (e.g., 500 meters)
+  uint16_t newAltitude = 500; // Example value in meters
+  error = scd4x.setSensorAltitude(newAltitude);
+  if (error) {
+    Serial.print("Error setting altitude: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Altitude set to 500 meters successfully.");
+    
+    // Print the altitude immediately after setting it
+    uint16_t sensorAltitude;
+    error = scd4x.getSensorAltitude(sensorAltitude);
+    if (error) {
+      Serial.print("Error retrieving updated altitude: ");
+      Serial.println(error);
+    } else {
+      Serial.printf("Altitude immediately after setting: %d meters\n", sensorAltitude);
+    }
+  }
+  // Reinitialize the sensor
+  error = scd4x.reinit();
+  if (error) {
+    Serial.print("Error reinitializing sensor: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Sensor reinitialized.");
+    
+    // Print the altitude after reinitialization
+    error = scd4x.getSensorAltitude(sensorAltitude);
+    if (error) {
+      Serial.print("Error retrieving altitude after reinitialization: ");
+      Serial.println(error);
+    } else {
+      Serial.printf("Altitude after reinitialization: %d meters\n", sensorAltitude);
+    }
+  }
+}
+
+void loop() {
+  // No continuous actions needed for this example
+  delay(10000); // Delay to prevent continuous printing
+}

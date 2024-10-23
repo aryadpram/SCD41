@@ -1,0 +1,646 @@
+\chapter{Metode Penelitian}
+
+\section{Alat dan Bahan Tugas akhir}
+
+    \subsection{Alat Tugas akhir}
+    
+    Alat-alat yang digunakan pada tugas akhir ini berupa perangkat keras maupun perangkat lunak sebagai sarana pendukung antara lain :
+
+    \begin{enumerate}
+        \item Komputer atau laptop dengan spesifikasi minumum sistem operasi Windows 10, \textit{processor} ARM64 atau x64, memori 4GB DDR3, kartu video yang mendukung resolusi tampilan minimum WXGA (1366 kali 768)
+	\item ESP32 \textit{development kit} sebagai \textit{microcontroller}
+        \item Sensirion SCD41 sebagai sensor untuk mengukur konsentrasi CO2 di dalam ruangan
+        \item \textit{Breadboard} sebagai ruang untuk melakukan \textit{prototyping} rangkaian
+        \item Modul RTC DS3231 digunakan untuk melacak waktu setiap data diambil
+        \item Modul microSD digunakan untuk menyimpan data yang diambil
+        \item Resistor minimal 4.7k sebagai \textit{pull up} resistor pin SCL dan SDK
+        \item \textit{Breakout board} SCD41 untuk menghubungkan sensor ke \textit{breadboard}
+        \item Kabel \textit{jumper }untuk menghubungkan komponen komponen pada rangkaian
+        \item Kabel \textit{micro} USB untuk komunikasi serial antara komputer atau laptop dengan \textit{microcontroller}
+        \item Visual Studio Code sebagai \textit{source code editor}
+        \item Saleae Logic Analyzer untuk mengamati gelombang I2C dari sensor ke \textit{microcontroller}
+        \item Aplikasi Logic untuk mengamati gelombang I2C di laptop atau komputer
+        \item Draw.io untuk membuat diagram alir
+    \end{enumerate}
+
+    
+    \subsection{Bahan Tugas akhir}
+    
+    Bahan tugas akhir yang digunakan untuk kebutuhan tugas akhir ini antara lain:
+    
+    \begin{enumerate}
+        \item \textit{Datasheet} Sensirion SCD41
+        \item \textit{Application Note} Sensirion SCD41
+        \item Dokumentasi ESP32
+        \item Dokumentasi I2C
+    \end{enumerate}
+
+\section{Metode yang Digunakan}
+
+    \subsection{Perancangan Perangkat}
+    Pada penelitian ini, sistem yang bekerja ditunjukkan oleh rangkaian pada Gambar \ref{fig:diagram-blok}. Konsentrasi CO2, suhu, dan kelembapan diukur oleh sensor SCD41. Data pengukuran dibaca oleh mikrokontroler ESP32 dan disimpan pada modul kartu microSD. Data pengukuran kemudian akan disimpan bersama dengan \textit{timestamp} dari modul RTC untuk penanda waktu.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=1\linewidth]{contents//chapter-3/diagram_blok.png}
+        \caption{Rangkaian Perangkat}
+        \label{fig:diagram-blok}
+    \end{figure}
+
+    Pada awalnya, tidak ada kebutuhan untuk menggunakan modul RTC dan microSD karena sistem direncanakan untuk mencatat data langsung ke \textit{Firebase Realtime Database}. Namun, menghubungkan ESP32 ke jaringan Wi-Fi UGM yang menggunakan keamanan Wi-Fi Enterprise terbukti tidak berhasil. Oleh karena itu, sebagai alternatif, diputuskan untuk menggunakan modul RTC dan microSD untuk mencatat dan menyimpan data secara lokal.
+
+    Perancangan perangkat keras mencakup rangkaian komponen yang akan digunakan sehingga dapat berjalan sesuai dengan \textit{firmware} yang akan dikembangkan dan dapat dilakukan pengujian dengannya. Komponen-komponen yang akan digunakan adalah sebagai berikut: SCD41, ESP32, modul RTC, dan modul microSD. Semua komponen tersebut akan dirangkai pada breadboard seperti yang ditunjukkan pada \ref{fig:diagram-blok}.
+    
+    Berdasarkan \textit{datasheet}, sensor SCD41 membutuhkan tegangan masukan sebesar 3.3V. Untuk menggunakan protokol komunikasi I2C, pin SDA dan SCL sensor memiliki pull-up resistor dengan besar resistansi yang digunakan pada perancangan ini adalah 4.7 k$\Omega$. Pin-pin sensor SCD41 dihubungkan dengan mikrokontroler sebagai berikut:
+    \begin{itemize}
+        \item \textbf{VDD}: 3.3V
+        \item \textbf{SDA}: PIN GPIO21 (I2C SDA)
+        \item \textbf{SCL}: PIN GPIO22 (I2C SCL)
+        \item \textbf{GND}: GND
+    \end{itemize}
+    
+    Modul RTC yang digunakan memiliki dukungan protokol komunikasi I2C. Pin-pin modul RTC dihubungkan dengan mikrokontroler sebagai berikut:
+    \begin{itemize}
+        \item \textbf{VDD}: 3.3V
+        \item \textbf{SDA}: PIN GPIO21 (I2C SDA)
+        \item \textbf{SCL}: PIN GPIO22 (I2C SCL)
+        \item \textbf{GND}: GND
+    \end{itemize}
+    
+    Modul microSD digunakan untuk penyimpanan data hasil pembacaan sensor. Pin-pin modul microSD dihubungkan dengan mikrokontroler sebagai berikut:
+    \begin{itemize}
+        \item \textbf{VCC}: 3.3V
+        \item \textbf{MISO}: PIN GPIO19
+        \item \textbf{MOSI}: PIN GPIO23
+        \item \textbf{SCK}: PIN GPIO18
+        \item \textbf{CS}: PIN GPIO5
+        \item \textbf{GND}: GND
+    \end{itemize}
+    
+    ESP32 sebagai mikrokontroler menggunakan daya dari \textit{wall adapter} sebagai catu dayanya melalui kabel \textit{micro-USB}. Kabel USB tersebut dapat sekaligus digunakan untuk komunikasi UART dengan komputer, untuk proses \textit{debugging} dan penulisan \textit{file} .bin ke mikrokontroler.
+        
+    \subsection{Pengembangan Firmware}
+    \label{firmware}
+        Tujuan utama dari pengembangan \textit{firmware} ini adalah agar mikrokontroler bisa mengakses sensor \textit{SCD41} melalui komunikasi I2C, dimana perangkat menggunakan alamat spesifik untuk berkomunikasi. Alamat-alamat ini memungkinkan perangkat \textit{master} untuk mengidentifikasi dan mengirim perintah ke perangkat target. Dalam sistem ini, ESP32 bertindak sebagai \textit{master} dan sensor SCD41 bertindak sebagai \textit{slave}. Menurut \textit{datasheet}, \textbf{alamat sensor SCD41 adalah 0x62}. Ketika mikrokontroler perlu berkomunikasi dengan sensor \textit{SCD41}, ESP32 harus mengirim alamat 0x62 sebagai byte pertama pada jalur data. Alamat ini memberi sinyal kepada sensor untuk merespon dan siap menerima perintah lebih lanjut. Dikarenakan I2C dapat memiliki beberapa perangkat di jalur yang sama, mengalamatkan setiap sensor dengan benar sangat penting untuk komunikasi yang akurat.
+        
+        \subsubsection{Pengembangan Fungsi Perintah}
+
+        Sensor SCD41 memiliki 27 perintah yang dapat dijalankan, mulai dari perintah untuk memulai pengukuran hingga membaca nilai pengukuran. Data yang dikirim ke sensor dan diterima dari sensor terdiri dari serangkaian \textit{command} 16-bit dan/atau \textit{words} 16-bit (yang mana masing-masing perintah atau \textit{word}nya diinterpretasikan sebagai \textit{unsigned integer} dengan byte paling signifikan dikirimkan terlebih dahulu). Setiap \textit{word} data selalu diikuti oleh CRC 8-bit (CRC 8-bit akan dijelaskan lebih lanjut pada subsubbab \ref{CRC}). Dalam proses \textit{write} ke sensor, pengiriman \textit{checksum} merupakan hal yang wajib dilakukan. Namun, pada proses \textit{read} dari sensor, tergantung pada \textit{master} untuk memutuskan apakah ingin memproses \textit{checksum} atau tidak. Setiap perintah sendiri memiliki kegunaanya masing-masing dan memiliki cara yang berbeda-beda untuk melaksankannya. Oleh karena itu, perlu diperhatikan bahwa pada \textit{SCD41} terdapat 4 jenis \textit{sequence} perintah \textit{I2C}, yaitu:
+        \begin{itemize}
+            \item \textit{Read}: Proses membaca data dari sensor. Mikrokontroler mengirimkan perintah untuk meminta data, dan sensor mengirimkan data yang diminta kembali ke mikrokontroler.
+            \item \textit{Write}: Proses menulis data ke sensor. Mikrokontroler mengirimkan perintah beserta data yang akan ditulis ke sensor.
+            \item \textit{Send}: Proses mengirim perintah sederhana ke sensor tanpa membutuhkan respons balik. Perintah ini biasanya digunakan untuk memulai suatu proses atau mengatur konfigurasi pada sensor.
+            \item \textit{Send command and fetch result}: Proses mengirim perintah ke sensor dan kemudian mengambil hasil dari perintah tersebut. Mikrokontroler mengirimkan perintah untuk menjalankan suatu operasi, dan kemudian membaca hasil operasi tersebut setelah sensor selesai memprosesnya.
+        \end{itemize}
+
+        \begin{landscape}
+        \begin{longtable}{|p{2cm}|p{8cm}|p{1.5cm}|p{2cm}|p{2cm}|p{2cm}|}
+        \caption{Daftar Perintah Sensor SCD41}
+        \label{tab:command_table} \\
+        \hline
+        \textbf{Tipe} & \textbf{Perintah} & \textbf{Hex. Code} & \textbf{Tipe \textit{sequence}} & \textbf{Waktu Pelaksanaan (ms)} & \textbf{Saat Pengukuran} \\ 
+        \hline
+        \endfirsthead
+        \multicolumn{6}{c}{{ \tablename\ \thetable{} -- lanjutan dari halaman sebelumnya}} \\
+        \hline
+        \textbf{Tipe} & \textbf{Perintah} & \textbf{Hex. Code} & \textbf{Tipe \textit{sequence}} & \textbf{Waktu Pelaksanaan (ms)} & \textbf{Saat Pengukuran} \\ 
+        \hline
+        \endhead
+        \hline \multicolumn{6}{|r|}{{Dilanjutkan pada halaman selanjutnya}} \\ \hline
+        \endfoot
+        \endlastfoot
+        
+        \textit{Basic Commands} & start\_periodic\_measurement & 0x21b1 & send & - & no \\
+        & read\_measurement & 0xec05 & read & 1 & yes \\
+        & stop\_periodic\_measurement & 0x3f86 & send & 500 & yes \\
+        \hline
+        
+        \textit{On-chip output signal compensation} & set\_temperature\_offset & 0x241d & write & 1 & no \\
+        & get\_temperature\_offset & 0x2318 & read & 1 & no \\
+        & set\_sensor\_altitude & 0x2427 & write & 1 & no \\
+        & get\_sensor\_altitude & 0x2322 & read & 1 & no \\
+        & set\_ambient\_pressure & 0xe000 & write & 1 & yes \\
+        & get\_ambient\_pressure & 0xe000 & read & 1 & yes \\
+        \hline
+        
+        \textit{Field calibration} & perform\_forced\_recalibration & 0x362f & send and fetch result & 400 & no \\
+        & set\_automatic\_self\_calibration\_enabled & 0x2416 & write & 1 & no \\
+        & get\_automatic\_self\_calibration\_enabled & 0x2313 & read & 1 & no \\
+        \hline
+        
+        \textit{Low power periodic measurement mode} & start\_low\_power\_periodic\_measurement & 0x21ac & send & - & no \\
+        & get\_data\_ready\_status & 0xe4b8 & read & 1 & yes \\
+        \hline
+        
+        \textit{Advanced features} & persist\_settings & 0x3615 & send & 800 & no \\
+        & get\_serial\_number & 0x3682 & read & 1 & no \\
+        & perform\_self\_test & 0x3639 & read & 10000 & no \\
+        & perform\_factory\_reset & 0x3632 & send & 1200 & no \\
+        & reinit & 0x3646 & send & 30 & no \\
+        \hline
+        
+        \textit{Single shot measurement mode} & measure\_single\_shot & 0x219d & send & 5000 & no \\
+        & measure\_single\_shot\_rht\_only & 0x2196 & send & 50 & no \\
+        & power\_down & 0x36e0 & send & 1 & no \\
+        & wake\_up & 0x36f6 & send & 30 & no \\
+        & set\_automatic\_self\_calibration\_initial\_period & 0x2445 & write & 1 & no \\
+        & get\_automatic\_self\_calibration\_initial\_period & 0x2340 & read & 1 & no \\
+        & set\_automatic\_self\_calibration\_standard\_period & 0x244e & write & 1 & no \\
+        & get\_automatic\_self\_calibration\_standard\_period & 0x234b & read & 1 & no \\
+        \hline
+        
+        \end{longtable}
+        \end{landscape}
+        
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=1\linewidth]{contents//chapter-3/uml.png}
+            \caption{UML Class Diagram for Sensirion}
+            \label{fig:uml}
+        \end{figure}
+
+        Dari setiap perintah yang tersedia pada SCD41, yang mana detailnya dapat dilihat pada Tabel \ref{tab:command_table}, dibuatlah \textit{header file} seperti yang dapat dilihat pada Gambar \ref{fig:uml} untuk mendefinisikan fungsi-fungsi dari perintah-perintah yang ada pada \textit{file} .cpp. Hal ini berarti ketika \textit{firmware/library} ini digunakan dalam suatu program, program tersebut dapat mengetahui fungsi-fungsi yang tersedia tanpa harus membaca detail implementasinya yang ada di \textit{file .cpp}, kecuali ketika salah satu fungsi tersebut dipanggil.
+
+        \textit{Framework} yang digunakan dalam pengembangan \textit{firmware} adalah \textit{framework} Arduino. Oleh karena itu, untuk melakukan komunikasi I2C dengan ESP32, digunakan \textit{library} Wire. Secara garis besar, fungsi - fungsi utama dalam menggunakan \textit{library} Wire untuk komunikasi I2C adalah sebagai berikut:
+
+        \begin{itemize}
+            \item \textbf{\texttt{Wire.beginTransmission(I2C\_ADDRESS)}}: Fungsi ini menginisialisasi komunikasi I2C dan mengatur alamat I2C perangkat. Parameter \texttt{I2C\_ADDRESS} adalah alamat perangkat I2C.
+            
+            \item \textbf{\texttt{Wire.write(command, size\_of\_command)}}: Fungsi ini mengirim data ke perangkat I2C. Parameter \texttt{command} adalah data yang akan dikirim, dan \texttt{size\_of\_command} adalah ukuran data tersebut.
+            
+            \item \textbf{\texttt{Wire.endTransmission()}}: Fungsi ini mengakhiri transmisi ke perangkat I2C, memastikan bahwa semua data telah terkirim.
+            
+            \item \textbf{\texttt{Wire.requestFrom(I2C\_ADDRESS, size\_of\_buffer)}}: Fungsi ini meminta data dari perangkat I2C. Parameter \texttt{I2C\_ADDRESS} adalah alamat perangkat I2C, dan \texttt{size\_of\_buffer} adalah ukuran \textit{buffer} yang akan menampung data yang diterima.
+        \end{itemize}
+    
+        Setelah memahami setiap perintah dan metode implementasi komunikasi I2C pada ESP32 menggunakan \textit{framework} Arduino, langkah selanjutnya adalah membuat fungsi untuk menjalankan perintah-perintah tersebut. Pada dasarnya, fungsi yang akan dibuat berisi cara menyusun struktur data sinyal I2C yang akan dikirim atau diterima sesuai dengan masing-masing perintah. Dengan demikian, setiap perintah dengan tipe \textit{sequence}  yang sama akan memiliki struktur yang serupa.
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.25\linewidth]{contents//chapter-3/send_flow.png}
+            \caption{Diagram Alir \textit{Sequence} Pengiriman}
+            \label{fig:send_flow}
+        \end{figure}
+        
+        Untuk tipe \textbf{send}, yang perlu dilakukan oleh \textit{master} adalah mengirim perintah ke \textit{slave}. Penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:send_flow} adalah sebagai berikut:
+
+        \begin{enumerate}
+            \item \textbf{Deklarasi Perintah dan Galat}: Pada bagian awal, akan didefinisikan fungsi itu sendiri, misalnya bernama \texttt{startPeriodicMeasurement} yang mana merupakan bagian dari kelas \texttt{SensirionI2CScd4x}. Fungsi ini mengembalikan nilai bertipe \texttt{uint16\_t} (bilangan bulat 16-bit tak bertanda). Selanjutnya, sebuah \textit{array} \texttt{command} bertipe \texttt{uint8\_t} (bilangan bulat 8-bit tak bertanda) dengan 2 elemen dideklarasikan dan diinisialisasi dengan nilai \texttt{0x21} dan \texttt{0xB1}. Nilai-nilai ini mewakili perintah untuk memulai pengukuran periodik pada sensor SCD41, \textit{hex. code} yang digunakan tersebut disesuaikan dengan \textit{datasheet} untuk setiap perintah pada fungsinya masing-masing. Pada baris ketiga, sebuah variabel \texttt{error} bertipe \texttt{uint16\_t} dideklarasikan dan diinisialisasi dengan nilai 0. Ini akan digunakan untuk menyimpan hasil komunikasi I2C (apakah berhasil atau tidak).
+
+            \item \textbf{Inisiasi Transmisi}: Selanjutnya, dimulailah komunikasi dengan perangkat I2C pada alamat \texttt{SCD4X\_I2C\_ADDRESS} yang mana bernilai \texttt{0x62} pada SCD41. Objek \texttt{Wire} adalah bagian dari \textit{library} I2C Arduino yang memfasilitasi komunikasi melalui \textit{bus} I2C.
+
+            \item \textbf{Pengiriman Perintah}: Fungsi \texttt{Wire.write()} mengirimkan \textit{array} \texttt{command} melalui \textit{bus} I2C. Dalam proses ini, \textit{bit} R/W (\textit{Read/Write}) juga ditransmisikan agar sensor tahu bahwa operasi yang akan dilakukan adalah operasi penulisan (\textit{Write}), yang diwakili oleh nilai 0. \texttt{sizeof(command)} memastikan bahwa jumlah \textit{byte} yang benar (2 dalam hal ini) dikirimkan. Setelah setiap byte dikirim, perangkat penerima (dalam hal ini sensor SCD41) mengirimkan bit ACK (Acknowledgement) untuk mengonfirmasi bahwa \textit{byte} telah diterima dengan benar. Dengan ini sinyal I2C yang akan dikirimkan telah terbentuk seperti yang ditunjukkan pada Gambar \ref{fig:send}.
+            
+            \begin{figure}[ht]
+                \centering
+                \includegraphics[width=1\linewidth]{contents//chapter-3/send.png}
+                \caption{\textit{Send I2C Sequence} (Diadaptasi dari \cite{scd4x_datasheet})}
+                \label{fig:send}
+            \end{figure}
+            
+            \item \textbf{Penghentian Transmisi}: Fungsi \texttt{Wire.endTransmission()} mengakhiri transmisi I2C dan mengembalikan kode status yang disimpan dalam variabel \texttt{error}. Kode status ini dapat menunjukkan apakah komunikasi berhasil atau jika ada kesalahan (0 berarti sukses, 1 berarti data terlalu panjang untuk dimuat pada \textit{buffer}, 2 berarti menerima bit NACK saat mengirim alamat, 3 berarti menerima bit NACK saat mengirim data, 4 berarti galat lainnya, 5 berarti \textit{timeout}).
+
+            \item \textbf{Tunggu hingga Data Terkirim}: Diberikan jeda singkat selama 1 milidetik untuk memastikan bahwa sensor memiliki cukup waktu untuk memproses perintah. Jumlah waktu jeda disesuaikan dengan \textit{datasheet} untuk tiap perintah. 
+            
+            \item \textbf{Pengembalian nilai galat}: Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C.
+
+        \end{enumerate}
+
+        Fungsi yang terbentuk ini juga digunakan untuk semua perintah yang tipe \textit{sequence}-nya \textit{send}, yaitu start\_periodic\_measurement, stop\_periodic\_measurement, start\_low\_\\power\_periodic\_measurement, persist\_settings, perform\_factory\_reset, reinit, measure\_\\single\_shot, measure\_single\_shot\_rht\_only, power\_down, wake\_up. Hal yang membedakkan hanya alamat memori atau \textit{hex. code} perintahnya dan jeda waktu yang dibutuhkan untuk sensor meresepon. Untuk detail teknis mengenai semua perintah yang tersedia, bisa dilihat pada Tabel \ref{tab:command_table}.
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.75\linewidth]{contents//chapter-3/write_flow.png}
+            \caption{Diagram Alir \textit{Sequence} Penulisan \textit{Offset} Suhu}
+            \label{fig:write_flow}
+        \end{figure}
+        
+        Untuk \textbf{perintah tipe \textit{write}}, yang perlu dilakukan oleh \textit{master} adalah mengirim perintah ke \textit{slave} yang diikuti oleh data dan checksum dari data tersebut. Serupa dengan fungsi \textit{send}, hanya saja, kali ini diikuti oleh data yang akan dijadikan masukan sensor. Contohnya pada fungsi \texttt{setTemperatureOffset} yang prosesnya dapat dilihat pada Gambar \ref{fig:write_flow}.  
+
+        Fungsi untuk mengatur \textit{offset} suhu ini dipisahkan menjadi dua bagian, yaitu \\ \texttt{setTemperatureOffset} dan \texttt{setTemperatureOffsetTicks}. Pemisahan ini dilakukan untuk memisahkan logika pengaturan \textit{offset} suhu dalam format \texttt{float} dan format \texttt{uint16\_t}, yang mana memudahkan pemeliharaan kode. Fungsi \\ \texttt{setTemperatureOffset} menerima nilai \texttt{tOffset} bertipe \texttt{float} dan mengonversinya ke dalam bentuk \texttt{uint16\_t} dengan nama \texttt{tOffsetTicks}. Setelah konversi, fungsi ini memanggil \texttt{setTemperatureOffsetTicks} untuk melakukan pengaturan \textit{offset} suhu pada sensor. 
+
+        Untuk perintah tipe \textit{write} yang tidak memerlukan konversi tipe data, fungsi yang dirancang tidak perlu dibagi menjadi dua bagian. Sebaliknya, cukup mengadaptasi fungsi transmisi \texttt{setTemperatureOffsetTicks} yang digunakan dalam fungsi \textit{offset} suhu di atas.
+
+        Penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:write_flow} untuk fungsi konversi adalah sebagai berikut:
+
+        \begin{enumerate}
+            \item \textbf{Konversi tipe data \textit{offset} suhu:} Fungsi \texttt{setTemperatureOffset} yang merupakan bagian dari kelas \texttt{SensirionI2CScd4x}, mengonversi nilai \texttt{tOffset} bertipe \texttt{float} ke \texttt{uint16\_t} dengan mengalikannya dengan 65536.0 dan membaginya dengan 175.0, kemudian menambahkan 0.5 untuk pembulatan. Hal ini dilakukan atas dasar spesifikasi konversi sinyal yang tersedia pada \textit{datasheet} SCD41 \cite{scd4x_datasheet} yang menyatakan bahwa  
+
+            \[ \text{word}[0] = T_{\text{offset}} \, [\text{$^{\circ}$}{C}] \times \frac{2^{16} - 1}{175} \]
+
+            Nilai hasil konversi ini disimpan dalam \texttt{tOffsetTicks}.
+
+            \item \textbf{Memanggil fungsi transmisi: }Fungsi ini kemudian memanggil fungsi \\ \texttt{setTemperatureOffsetTicks} dengan \texttt{tOffsetTicks} sebagai argumen dan mengembalikan hasilnya.
+
+            \item \textbf{Pengembalian nilai galat:} Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C.
+        \end{enumerate}
+        
+        Sedangkan, penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:write_flow} untuk fungsi transmisi adalah sebagai berikut:
+        
+        \begin{enumerate}
+            \item \textbf{Deklarasi Perintah dan Galat:} Fungsi transmisi \texttt{setTemperatureOffsetTicks} yang merupakan bagian dari kelas \texttt{SensirionI2CScd4x} didefinisikan. Fungsi ini mengembalikan nilai bertipe \texttt{uint16\_t} (bilangan bulat 16-bit tak bertanda). Selanjutnya, sebuah \textit{array} \texttt{command} bertipe \texttt{uint8\_t} (bilangan bulat 8-bit tak bertanda) dengan 5 elemen dideklarasikan dan diinisialisasi dengan nilai \texttt{0x24}, \texttt{0x1D}, dan dua byte dari \texttt{tOffset}. Dua byte awal ini mewakili perintah untuk mengatur \textit{offset} suhu pada sensor SCD41, \textit{hex. code} yang digunakan tersebut disesuaikan dengan \textit{datasheet} untuk setiap perintah pada fungsinya masing-masing. Dua byte selanjutnya diperoleh dengan menggeser bit \texttt{tOffset} ke kanan 8 bit dan melakukan operasi \texttt{AND} dengan \texttt{0xFF} untuk mendapatkan byte tinggi, serta melakukan operasi \texttt{AND} antara \texttt{tOffset} dengan \texttt{0xFF} untuk mendapatkan byte rendah. Elemen kelima diinisialisasi dengan nilai 0.
+
+            Selanjutnya, elemen kelima dari array \texttt{command} diisi dengan nilai CRC (Cyclic Redundancy Check) yang dihitung menggunakan fungsi \texttt{generateCRC} pada dua byte data mulai dari elemen ketiga dari \texttt{command}. Fungsi CRC ini sendiri akan dibahas lebih lanjut pada subsubbab \ref{CRC}. Variabel \texttt{error} bertipe \texttt{uint16\_t} dideklarasikan dan diinisialisasi dengan nilai 0. Ini akan digunakan untuk menyimpan hasil komunikasi I2C (apakah berhasil atau tidak).
+            
+            \item \textbf{Inisiasi Transmisi:} Selanjutnya, \textit{master} memulai komunikasi dengan perangkat I2C pada alamat \texttt{SCD4X\_I2C\_ADDRESS}, yang mana bernilai \texttt{0x62} pada SCD41. 
+
+            \item \textbf{Pengiriman Perintah: }Selanjutnya, fungsi \texttt{Wire.write()} mengirimkan array \texttt{command} melalui bus I2C. Dalam proses ini, bit R/W (Read/Write) juga ditransmisikan dulu untuk menunjukkan bahwa operasi yang akan dilakukan adalah operasi penulisan (write), yang diwakili oleh nilai 0. \texttt{sizeof(command)} memastikan bahwa jumlah byte yang benar (5 dalam hal ini) dikirimkan. Setelah setiap byte dikirim, perangkat penerima (dalam hal ini sensor SCD4x) mengirimkan bit ACK (Acknowledgement) yang bernilai 0 untuk mengonfirmasi bahwa byte telah diterima dengan benar dan mengirimkan bit NACK (Negative Acknowledgement atau Not Acknowledged) yang bernilai 1. \textit{Sequence} yang terbentuk dapat dilihat pada Gambar \ref{fig:write} 
+
+            \begin{figure}[ht]
+                \centering
+                \includegraphics[width=1\linewidth]{contents//chapter-3/write.png}
+                \caption{\textit{Write I2C Sequence} (Diadaptasi dari \cite{scd4x_datasheet})}
+                \label{fig:write}
+            \end{figure}
+            
+            \item \textbf{Penghentian Transmisi: } Selanjutnya, fungsi \texttt{Wire.endTransmission()} mengakhiri transmisi I2C dan mengembalikan kode status yang disimpan dalam variabel \texttt{error}. Kode status ini dapat menunjukkan apakah komunikasi berhasil atau jika ada kesalahan (0 berarti sukses, 1 berarti data terlalu panjang untuk dimuat pada \textit{buffer}, 2 berarti menerima bit NACK saat mengirim alamat, 3 berarti menerima bit NACK saat mengirim data, 4 berarti galat lainnya, 5 berarti \textit{timeout}).
+            
+            \item \textbf{Tunggu hingga Data Terkirim}: Diberikan jeda singkat selama 1 milidetik untuk memastikan bahwa sensor memiliki cukup waktu untuk memproses perintah. Jumlah waktu jeda disesuaikan dengan \textit{datasheet} untuk tiap perintah. 
+            
+            \item \textbf{Pengembalian nilai galat}: Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C.
+        \end{enumerate}
+        
+        Fungsi transmisi yang terbentuk ini juga digunakan untuk semua perintah lain dengan tipe \textit{sequence} \textit{write}, yaitu set\_sensor\_altitude, set\_ambient\_pressure, set\_automatic\\ \_self\_calibration\_enabled, set\_automatic\_self\_calibration\_initial\_period, set\_automatic\_self\_ calibration\_standard\_period. Hal yang membedakkan adalah alamat memori atau \textit{hex. code} perintahnya, data yang akan di-\textit{write} ke sensor, dan jumlah jeda waktu yang dibutuhkan untuk sensor merespon. Untuk detail teknis mengenai semua perintah yang tersedia, bisa dilihat pada Tabel \ref{tab:command_table}.
+
+        \begin{figure}[H]
+            \centering
+            \makebox[\textwidth]{\includegraphics[width=1.25\linewidth]{contents/chapter-3/read_flow.png}}
+            \caption{Diagram Alir \textit{Sequence} Pembacaan}
+            \label{fig:read_flow}
+        \end{figure}
+
+        Untuk tipe \textbf{read}, yang perlu dilakukan oleh \textit{master} adalah mengirim perintah ke \textit{slave} dan kemudian menerima data dari \textit{slave} yang diikuti oleh data dan checksum dari data tersebut. Contohnya pada fungsi \texttt{readMeasurement} yang prosesnya dapat dilihat pada Gambar \ref{fig:read_flow}.
+
+        Fungsi untuk membaca pengukuran ini dipisahkan menjadi dua bagian, yaitu \texttt{readMeasurement} dan \texttt{readMeasurementTicks}. Pemisahan ini dilakukan untuk memisahkan logika pembacaan data mentah dalam bentuk \texttt{uint16\_t} dan logika konversi data tersebut menjadi bentuk \texttt{float}, yang mana memudahkan pemeliharaan kode. Fungsi \texttt{readMeasurement} memanggil \texttt{readMeasurementTicks} untuk membaca data mentah dari sensor dan kemudian mengonversi nilai suhu dan kelembaban dari format \texttt{uint16\_t} ke \texttt{float}. 
+
+        Untuk perintah tipe \textit{read} yang tidak memerlukan konversi tipe data, fungsi yang dirancang tidak perlu dibagi menjadi dua bagian. Sebaliknya, cukup mengadaptasi fungsi transmisi \texttt{readMeasurementTicks} yang digunakan dalam fungsi pembacaan data pengukuran ini.
+
+        Penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:read_flow} untuk fungsi transmisi adalah sebagai berikut:
+
+        \begin{enumerate}
+            \item \textbf{Deklarasi Perintah, \textit{Buffer }dan Nilai Galat:} Fungsi \texttt{readMeasurementTicks} yang merupakan bagian dari kelas  \texttt{SensirionI2CScd4x} ini didefinisikan pada bagian awal. Fungsi ini mengembalikan nilai bertipe \texttt{uint16\_t}.Selanjutnya, sebuah \textit{array} \texttt{command} bertipe \texttt{uint8\_t} dengan 2 elemen dideklarasikan dan diinisialisasi dengan nilai \texttt{0xEC} dan \texttt{0x05}. Nilai-nilai ini mewakili perintah untuk meminta hasil pembacaan pada sensor SCD41, \textit{hex. code} yang digunakan tersebut disesuaikan dengan \textit{datasheet} untuk setiap perintah pada fungsinya masing-masing. Pada baris ketiga, sebuah \textit{array} \texttt{buffer} bertipe \texttt{uint8\_t} dengan 9 elemen dideklarasikan untuk menyimpan data yang diterima dari sensor. Selanjutnya, pada baris keempat, variabel \texttt{error} bertipe \texttt{uint16\_t} dideklarasikan dan diinisialisasi dengan nilai 0 untuk menyimpan hasil komunikasi I2C.
+            
+            \item \textbf{Inisiasi transmisi:} Selanjutnya, dimulai komunikasi dengan perangkat I2C pada alamat \texttt{SCD4X\_I2C\_ADDRESS}. 
+            
+            \item \textbf{Pengiriman perintah:} Selanjutnya \textit{master} mengirimkan array \texttt{command} melalui bus I2C. Dalam proses ini, bit R/W (Read/Write) juga ditransmisikan dulu untuk menunjukkan bahwa operasi yang akan dilakukan adalah operasi penulisan (\textit{write}), yang diwakili oleh nilai 0. Setelah setiap byte dikirim, perangkat penerima (dalam hal ini sensor SCD4x) mengirimkan bit ACK (Acknowledgement) yang bernilai 0 untuk mengonfirmasi bahwa byte telah diterima dengan benar dan mengirimkan bit NACK (Negative Acknowledgement atau Not Acknowledged) yang bernilai 1. 
+            
+            \item \textbf{Penghentian transimisi:} Setelah itu, baris ketujuh mengakhiri transmisi I2C dan mengembalikan kode status yang disimpan dalam variabel \texttt{error}. Jika terjadi kesalahan, fungsi ini mengembalikan nilai \texttt{error}.
+
+            \item \textbf{Penanganan Galat:} Nilai galat yang baru saja didapatkan akan dicek. Jika nilainya 0, maka proses akan lanjut ke langkah berikutnya. Sebaliknya, jika nilainya tidak 0, maka nilai galat tersebut akan dikembalikan. 
+            
+            \item \textbf{Jeda:} Diberikan jeda singkat selama 1 milidetik untuk memastikan bahwa sensor memiliki cukup waktu untuk memproses perintah.
+            
+            \item \textbf{Permintaan Data:} Setelah itu, \textit{master} meminta data dari perangkat I2C byte per byte dan menyimpannya dalam \texttt{buffer}. Dalam proses ini, bit R/W (Read/Write) juga ditransmisikan dulu untuk menunjukkan bahwa operasi yang akan dilakukan adalah operasi penulisan (Read), yang diwakili oleh nilai 1. Setelah setiap byte diterima, perangkat pengirim (dalam hal ini ESP32) mengirimkan bit ACK (Acknowledgement) yang bernilai 0 untuk mengonfirmasi bahwa byte telah diterima dengan benar dan mengirimkan bit NACK (Negative Acknowledgement atau Not Acknowledged) yang bernilai 1. 
+
+            Ilustrasi \textit{sequence} mulai dari pengiriman perintah hingga penerimaan data dapat dilihat pada Gambar \ref{fig:read}.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=1\linewidth]{contents//chapter-3/read.png}
+                \caption{\textit{Read I2C Sequence} (Diadaptasi dari \cite{scd4x_datasheet})}
+                \label{fig:read}
+            \end{figure}
+            
+            \item \textbf{Cek Jumlah Data:} Jika jumlah byte yang tersedia kurang dari ukuran \texttt{buffer}, fungsi mengembalikan nilai 6 untuk menunjukkan kesalahan bahwa data yang tersedia kurang dari ukuran yang diinginkan. Sebaliknya, jika jumlah byte sesuai, proses akan lanjut ke langkah berikutnya.
+            
+            \item \textbf{Mengisi \textit{buffer:}} Selanjutnya, fungsi membaca data dari sensor dan memasukannya ke \texttt{buffer}.
+            
+            \item \textbf{Perhitungan CRC-8}: Dilakukan perhitungan CRC untuk setiap data (CO2, suhu, dan kelembapan).
+            
+            \item \textbf{Pengujian CRC-8}: Jika CRC tidak cocok, fungsi mengembalikan nilai 7 untuk menunjukkan bahwa terjadi ketidakcocokan antara nilai CRC hasil perhitungan dengan CRC yang diterima \textit{master}. Jika CRC cocok, proses akan lanjut ke langka berikutnya. (Penjelasan lebih detail mengenai fungsi CRC-8 dapat dibaca pada subsubbab \ref{CRC})
+            
+            \item \textbf{Mengisi Nilai Pembacaan:} Data mentah disimpan dalam variabel \texttt{co2}, \texttt{temperature}, dan \texttt{humidity}.
+
+            \item \textbf{Pengembalian nilai galat}: Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C.
+        \end{enumerate}
+            
+        Penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:read_flow} untuk fungsi konversi adalah sebagai berikut:
+
+        \begin{enumerate}
+        
+            \item \textbf{Deklarasi}: Pada awalnya, nilai galat dideklarasikan dan diberi nilai 0. Variabel untuk menyimpan nilai sementara \texttt{temperatureTicks} dan \texttt{humidityTicks} juga dideklarasikan.
+            
+            \item \textbf{Memanggil fungsi transmisi: }Fungsi ini kemudian memanggil fungsi \\ \texttt{readMeasurementTicks} dan mengembalikan hasilnya.
+            
+            \item \textbf{Penanganan Galat:} Nilai galat yang baru saja didapatkan akan dicek. Jika nilainya 0, maka proses akan lanjut ke langkah berikutnya. Sebaliknya, jika nilainya tidak 0, maka nilai galat tersebut akan dikembalikan. 
+            
+            \item \textbf{Konversi tipe data:} Nilai CO2 tidak perlu konversi sehingga langsung dimasukkan ke variabel CO2. Sedangkan, nilai-nilai \texttt{temperatureTicks} dan \texttt{humidityTicks} dikonversi dari format \texttt{uint16\_t} ke \texttt{float} dengan mengalikannya dengan faktor konversi sesuai spesifikasi dari \textit{datasheet} SCD41 \cite{scd4x_datasheet}. Perhitungannya adalah sebagai berikut:  
+
+            \[ T = -45 + 175 \times \frac{\text{word}[1]}{2^{16} - 1} \]
+            \[ RH = 100 \times \frac{\text{word}[2]}{2^{16} - 1} \]
+
+            Nilai hasil konversi ini disimpan dalam \texttt{temperature} dan \texttt{humidity}.
+
+            \item \textbf{Pengembalian nilai galat:} Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C. (0 berarti sukses, 1 berarti data terlalu panjang untuk dimuat pada \textit{buffer}, 2 berarti menerima bit NACK saat mengirim alamat, 3 berarti menerima bit NACK saat mengirim data, 4 berarti galat lainnya, 5 berarti \textit{timeout}, 6 berarti data yang tersedia lebih sedikit dari \textit{buffer} yang tersedia, 7 berarti nilai CRC yang diterima tidak cocok). Baris terakhir menutup fungsi \texttt{readMeasurementTicks}.
+            
+        \end{enumerate}
+        
+        Kedua fungsi ini digunakan untuk semua perintah yang bertipe \textit{sequence} \textit{read} dan memerlukan konveresi, yaitu read\_measurement dan get\_temperature\_offset. Sedangkan untuk perintah yang tidak memerlukan konversi, hanya mengadaptasi fungsi transmisi. Adapun perintah-perintah tersebut adaalah get\_sensor\_altitude, get\_ambient \_pressure, get\_automatic\_self\_calibration\_enabled, get\_data\_ready\_status, get\_serial\_number, perform\_self\_test, get\_automatic\_self\_calibration\_initial\_period, dan get\_automatic\_self\_ calibration\_standard\_period. Perbedaan terletak pada alamat memori atau \textit{hex. code} perintahnya, data yang akan di-\textit{read} dari sensor, dan jeda waktu yang dibutuhkan sensor memberi respon. Untuk detail teknis mengenai semua perintah yang tersedia, bisa dilihat pada \ref{tab:command_table}.
+
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=1\linewidth]{contents/chapter-3/send_fetch_flow.png}
+            \caption{Diagram Alir \textit{Sequence Send and Fetch}}
+            \label{fig:send_fetch_flow}
+        \end{figure}
+
+        Untuk \textbf{tipe \textit{send command and fetch result}}, yang perlu dilakukan \textit{master} adalah mengirim perintah ke \textit{slave} beserta data (meskipun nama tipe menunjukkan bahwa ini merupakan perintah \textit{send}, tetapi sebenarnya perintah ini melakukan \textit{write}) dan CRC-8 dari data tersebut. Kemudian, \textit{slave} mengirim data respon beserta CRC-8 dari data tersebut. Pada SCD41, hanya ada satu perintah yang merupakan tipe \textit{send command and fetch result}, yaitu \texttt{performForcedRecalibration}. Proses perintah tersebut dilaksanakan dapat dilihat pada Gambar \ref{fig:send_fetch_flow}. 
+
+        Fungsi ini bertujuan untuk melakukan kalibrasi ulang paksa pada sensor CO2 dengan asumsi konsentrasi CO2 yang diberikan adalaah konsentrasi CO2 yang ada di sekitar sensor tersebut saat proses kalibrasi ulang. 
+
+        \begin{enumerate}
+            \item \textbf{Deklarasi:} Pada awalnya, fungsi \texttt{performForcedRecalibration} didefnisikan, fungsi ini mengembalikan nilai bertipe \texttt{uint16\_t} (bilangan bulat 16-bit tak bertanda). Parameter \texttt{targetCo2Concentration} adalah target konsentrasi CO2 untuk kalibrasi ulang, dan \texttt{frcCorrection} digunakan untuk menyimpan nilai \textit{offset} dari hasil koreksi kalibrasi ulang jika proses berhasil. Sebaliknya, jika proses kalibrasi ulang paksa ini tidak berhasil, maka nilai \texttt{0xffff} akan di-\textit{assign} ke \texttt{frcCorrection}.
+
+            Selanjutnya, sebuah array \texttt{command} bertipe \texttt{uint8\_t} dengan 5 elemen dideklarasikan dan diinisialisasi dengan nilai \texttt{0x24}, \texttt{0x27}, dan dua byte dari \\ \texttt{targetCo2Concentration}. Dua byte ini diperoleh dengan menggeser bit \texttt{targetCo2Concentration} ke kanan 8 kali dan melakukan operasi \texttt{AND} dengan \texttt{0xFF} untuk mendapatkan byte tinggi, serta melakukan operasi \texttt{AND} antara \texttt{targetCo2Concentration} dengan \texttt{0xFF} untuk mendapatkan byte rendah. Elemen kelima diinisialisasi dengan nilai 0. Selanjutnya, diisilah elemen kelima dari array \texttt{command} dengan nilai CRC (Cyclic Redundancy Check) yang dihitung menggunakan fungsi \texttt{generateCRC} pada dua byte data mulai dari elemen ketiga dari \texttt{command}. Penjelasan mengenai fungsi CRC-8 dapat dilihat pada subsubbab \ref{CRC}.
+
+            Selanjutnya dideklarasikan variabel \texttt{error} bertipe \texttt{uint16\_t} dan menginisialisasinya dengan nilai 0. Ini akan digunakan untuk menyimpan hasil komunikasi I2C (apakah berhasil atau tidak). Baris kelima mendeklarasikan buffer \texttt{buffer} dengan 3 elemen untuk menyimpan data yang diterima dari sensor.
+            
+            \item \textbf{Inisiasi transmisi:} Komunikasi I2C dimulai dengan perangkat pada alamat \\ \texttt{SCD4X\_I2C\_ADDRESS}, yang mana bernilai \texttt{0x62} pada SCD41.
+
+            \item \textbf{Pengiriman Perintah:} Fungsi \texttt{Wire.write()} digunakan untuk mengirimkan array \texttt{command} melalui bus I2C. Dalam proses ini, bit R/W (Read/Write) juga ditransmisikan untuk menunjukkan bahwa operasi yang akan dilakukan adalah operasi penulisan (Write), yang diwakili oleh nilai 0. Setelah setiap byte dikirim, perangkat penerima (dalam hal ini sensor SCD4x) mengirimkan bit ACK (Acknowledgement) yang bernilai 0 untuk mengonfirmasi bahwa byte telah diterima dengan benar dan mengirimkan bit NACK (Negative Acknowledgement atau Not Acknowledged) yang bernilai 1.
+
+            \item \textbf{Penghentian Transmisi}: Fungsi \texttt{Wire.endTransmission()} digunakan untuk mengakhiri transmisi I2C dan mengembalikan kode status yang disimpan dalam variabel \texttt{error} (0 berarti sukses, 1 berarti data terlalu panjang untuk dimuat pada \textit{buffer}, 2 berarti menerima bit NACK saat mengirim alamat, 3 berarti menerima bit NACK saat mengirim data, 4 berarti galat lainnya, 5 berarti \textit{timeout}, 6 berarti data yang tersedia lebih sedikit dari \textit{buffer} yang tersedia, 7 berarti nilai CRC yang diterima tidak cocok).
+
+            \item \textbf{Penanganan Galat:} Nilai galat yang baru saja didapatkan akan dicek. Jika nilainya 0, maka proses akan lanjut ke langkah berikutnya. Sebaliknya, jika nilainya tidak 0, maka nilai galat tersebut akan dikembalikan. 
+
+            \item \textbf{Jeda:} Diberikan jeda selama 400 milidetik untuk memberikan waktu bagi sensor melakukan kalibrasi ulang.
+            
+            \item \textbf{Permintaan Data:} Setelah itu, \textit{master} meminta data dari perangkat I2C byte per byte dan menyimpannya dalam \texttt{buffer}. Dalam proses ini, bit R/W (Read/Write) juga ditransmisikan dulu untuk menunjukkan bahwa operasi yang akan dilakukan adalah operasi penulisan (Read), yang diwakili oleh nilai 1. Setelah setiap byte diterima, perangkat pengirim (dalam hal ini ESP32) mengirimkan bit ACK (Acknowledgement) yang bernilai 0 untuk mengonfirmasi bahwa byte telah diterima dengan benar dan mengirimkan bit NACK (Negative Acknowledgement atau Not Acknowledged) yang bernilai 1. 
+
+            Ilustrasi \textit{sequence} mulai dari pengiriman perintah hingga penerimaan data dapat dilihat pada Gambar \ref{fig:send_fetch}.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=1\linewidth]{contents//chapter-3/send_fetch.png}
+                \caption{\textit{Send command and fetch result I2C Sequence} (Diadaptasi dari \cite{scd4x_datasheet})}
+                \label{fig:send_fetch}
+            \end{figure}
+            
+            \item \textbf{Cek Jumlah Data:} Jika jumlah byte yang tersedia kurang dari ukuran \texttt{buffer}, fungsi mengembalikan nilai 6 untuk menunjukkan kesalahan bahwa data yang tersedia kurang dari ukuran yang diinginkan. Sebaliknya, jika jumlah byte sesuai, proses akan lanjut ke langkah berikutnya.
+            
+            \item \textbf{Mengisi \textit{buffer:}} Selanjutnya, fungsi membaca data dari sensor dan memasukannya ke \texttt{buffer}.
+            
+            \item \textbf{Perhitungan CRC-8}: Dilakukan perhitungan CRC untuk data (2 byte pertama).
+            
+            \item \textbf{Pengujian CRC-8}: Jika CRC tidak cocok, fungsi mengembalikan nilai 7 untuk menunjukkan bahwa terjadi ketidakcocokan antara nilai CRC hasil perhitungan dengan CRC yang diterima \textit{master}. Jika CRC cocok, proses akan lanjut ke langka berikutnya. (Penjelasan lebih detail mengenai fungsi CRC-8 dapat dibaca pada subsubbab \ref{CRC})
+            
+            \item \textbf{Mengisi Nilai Pembacaan:} Akhirnya, nilai koreksi kalibrasi ulang (\texttt{frcCorrection}) diekstraksi dari dua byte pertama dari \texttt{buffer} dan disimpan dalam variabel \\ \texttt{frcCorrection}.
+
+            \item \textbf{Pengembalian nilai galat}: Akhirnya, fungsi ini mengembalikan kode \texttt{error} yang menunjukkan status komunikasi I2C.
+            
+        \end{enumerate}
+
+    Fungsi \textit{send and fetch} yang telah dirancang ini hanya digunakan pada satu perintah, yaitu \texttt{performForcedRecalibration} karena hanya ada satu perintah pada SCD41 dengan tipe \textit{send and fetch} ini.
+        
+        \subsubsection{Pengembangan Fungsi \textit{Cylic Redundancy Check 8 Bit}} \label {CRC}
+        
+        
+        Seperti yang telah sebutkan pada subsubbab \ref{firmware}, setiap byte data yang diterima dan dikirim sensor SCD41 akan diikuti oleh sebuah byte CRC. \textit{Checksum} CRC 8-bit ini dihasilkan oleh sebuah algoritma CRC. Properti-propertinya ditampilkan pada Tabel \ref{tabel:properti_crc8}. CRC yang dihasilkan berdasarkan dua byte data yang dikirim sebelumnya. Untuk menghitung \textit{checksum}nya, hanya dua byte data yang dikirim sebelumnya yang digunakan. Perlu diperhatikan bahwa byte perintah tidak diikuti oleh CRC.
+
+            \begin{table}[H]
+            \centering
+            \caption{Properti CRC-8 I2C (Diadaptasi dari \cite{scd4x_datasheet})}
+            \label{tabel:properti_crc8}
+            \begin{tabular}{|l|l|}
+            \hline
+            \textbf{Properti}       & \textbf{Nilai}                      \\ \hline
+            Nama                    & CRC-8                               \\ \hline
+            Lebar                   & 8 bit                               \\ \hline
+            Data yang Dilindungi    & data baca dan/atau tulis            \\ \hline
+            Polinomial              & 0x31 (x\textsuperscript{8} + x\textsuperscript{5} + x\textsuperscript{4} + 1) \\ \hline
+            Inisialisasi            & 0xff                                \\ \hline
+            Refleksi input          & Tidak                                \\ \hline
+            Refleksi output         & Tidak                                \\ \hline
+            XOR Akhir               & 0x00                                \\ \hline
+            Contoh                  & CRC (0xbeef) = 0x92                 \\ \hline
+            \end{tabular}
+            \end{table}
+
+        Sederhananya, byte CRC adalah sisa dari perhitungan byte data yang dibagi dengan byte polonomial CRCnya, yaitu \texttt{0x31} pada SCD41.
+
+        Untuk menghitung nilai CRC, kedua byte tadi direpresentasikan sebagai polinomial dan dilakukan pembagian polinomial. Misalkan diberikan data word 3-bit 0x5 dengan polinomial 5-bit 0x25. Untuk melakukan ini, ditambahkan nilai cek awal berupa nol 5-bit pada data, yang kemudian akan digunakan untuk menghitung nilai cek yang sebenarnya di akhir.
+
+        Perhitungan ini dilakukan menggunakan algoritma pembagian bersusun yang biasa dipakai pada bilangan desimal, tetapi kali ini semua digitnya dalam bentuk biner sehingga pembagian hanya mengambil koefisien-koefisien dari polinomialnya. Berikut adalah langkah-langkahnya:
+
+        \begin{enumerate}
+            \item Tuliskan dividen dan pembagi dalam bentuk biner:
+               \[ \text{Dividen: } 1x^7 + 0x^6 + 1x^5 + 0x^4 + 0x^3 + 0x^2 + 0x^1 \rightarrow 1 \ 0 \ 1 \ 0 \ 0 \ 0 \ 0 \ 0 \]
+               \[ \text{Pembagi: } x^5 + 0x^4 + 0x^3 + x^2 + 1 \rightarrow 1 \ 0 \ 0 \ 1 \ 0 \ 1 \]
+                       
+            \item Percobaan Pengurangan:
+            
+                \[
+                \begin{array}{r}\
+                    \begin{array}{cccccccccc}
+                        \textit{100101}& \textbf{|} & 1 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+                        & - & 1 & 0 & 0 & 1 & 0 & 1 &   &   \\
+                        \end{array} \\
+                        \hline
+                        \begin{array}{ccccccccc}
+                          & \textit{\color{gray}0} & 0 & 1 & 1 & 0 & 1 & 0 & 0 \\
+                    \end{array}
+                \end{array}
+                \]
+                
+                Pertama, coba lakukan pengurangan dan lihat apakah hasilnya cocok dengan sisa dividen, dalam hal ini pembagi 100101 cocok sehingga kita melakukan operasi XOR (pengurangan biner). Hasilnya adalah \( 0 \ 0 \ 1 \ 1 \ 0 \ 1 \ 0 \ 0 \). Perhatikan bahwa MSB atau koefisien teratas dari hasilnya adalah nol, yang mana merupakan tujuan dari setiap algoritma pembagian bersusun (pada setiap langkah kita harus menghilangkan digit teratas sehingga menjadi nol dan kemudian memindahkan satu digit ke kanan untuk langkah berikutnya).
+        
+            \item Geser pembagi satu bit ke kanan:
+            
+                \[ 
+                \begin{array}{r}
+                        \begin{array}{cccccccccc}
+                            \textit{100101}& \textbf{|} & 1 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+                            & - & 1 & 0 & 0 & 1 & 0 & 1 &   &   \\
+                            \end{array} \\
+                            \hline
+                            \begin{array}{ccccccccc}
+                              &  & 0 & 1 & 1 & 0 & 1 & 0 & 0 \\
+                               & - & 1 & 0 & 0 & 1 & 0 & 1 &  \\
+                            \end{array} \\
+                            \hline
+                            \begin{array}{ccccccccc}
+                              &  & \textit{\color{gray}0} & \textit{\color{gray}1} & \textit{\color{gray}1} & \textit{\color{gray}0} & \textit{\color{gray}1} & \textit{\color{gray}0} & \textit{\color{gray}0} \\
+                            \end{array} \\
+                    \end{array} 
+                \]
+        
+                Karena pembagi terlalu besar untuk dikurangkan dari bagian dividen saat ini, kita hanya menggesernya ke kanan lagi. Tidak ada operasi XOR yang dilakukan, sehingga hasilnya tetap \( 0 \ 0 \ 1 \ 1 \ 0 \ 1 \ 0 \ 0 \).
+        
+            \item Lanjutkan proses hingga hasilnya memiliki lebih sedikit bit daripada pembagi
+            
+                \[ 
+                \begin{array}{r}
+                        \begin{array}{cccccccccc}
+                            \textit{100101}& \textbf{|} & 1 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+                            & - & 1 & 0 & 0 & 1 & 0 & 1 &   &   \\
+                            \end{array} \\
+                            \hline
+                            \begin{array}{ccccccccc}
+                              &  & 0 & 1 & 1 & 0 & 1 & 0 & 0 \\
+                               & - & 1 & 0 & 0 & 1 & 0 & 1 &  \\
+                            \end{array} \\
+                            \hline
+                            \begin{array}{ccccccccc}
+                              &  &  & 1 & 1 & 0 & 1 & 0 & 0 \\
+                              &  & -& 1 & 0 & 0 & 1 & 0 & 1  \\
+                            \end{array} \\
+                            \hline
+                            \begin{array}{ccccccccc}
+                              &  &  & \textit{\color{gray}0} & 1 & 0 & 0 & 0 & 1 \\
+                            \end{array} \\
+                            
+                    \end{array} 
+                \]
+        
+                Kita terus menggeser, menyelaraskan, dan melakukan operasi XOR hingga hasil yang tersisa memiliki lebih sedikit bit daripada pembagi. Di sini, hasil akhirnya adalah \( 1 \ 0 \ 0 \ 0 \ 1 \) karena tidak ada lagi bit signifikan yang perlu diproses.
+        
+            \item Sisa akhir
+                \[
+                \begin{array}{ccccccccc}
+                  &  &  &  & \textbf{1} & \textbf{0} & \textbf{0} & \textbf{0} & \textbf{1} \\
+                \end{array} \\
+                \]
+        
+                Sisa akhir adalah \( 1 \ 0 \ 0 \ 0 \ 1 \), yang sesuai dengan polinomial \(x^5 + x\)
+        \end{enumerate}
+        
+        Namun, perhitungan CRC lebih umum dilakukan menggunakan metode \textit{shift register} daripada pembagian bersusun karena beberapa alasan yang berkaitan dengan efisiensi dan kesederhanaan. \textit{Shift register} memungkinkan menggunakan operasi bitwise, seperti shift dan XOR, yang secara signifikan lebih cepat daripada pembagian aritmatika, terutama dalam implementasi perangkat keras. Operasi-operasi itu juga dapat diproses secara paralel, yang mana makin mempercepat perhitungan CRC. Selain itu, \textit{shift register} mudah diimplementasikan menggunakan gerbang logika dasar dan memerlukan sumber daya yang lebih sedikit, yang sangat penting untuk sistem tertanam dengan daya komputasi terbatas.
+
+        Proses implementasi \textit{shift register} yang umum digunakan pada perhitungan CRC ini dapat dilihat pada Gambar \ref{fig:crc_flow}
+        
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.6\linewidth]{contents//chapter-3/crc_flow.png}
+            \caption{Diagram Alir Fungsi CRC 8-Bit}
+            \label{fig:crc_flow}
+        \end{figure}
+
+        \begin{enumerate}
+            \item \textbf{Deklarasi:} 
+            Pada tahap ini, parameter-parameter yang akan digunakan dalam perhitungan CRC dideklarasikan, yaitu:
+            \begin{itemize}
+                \item \texttt{data}: array yang berisi data yang akan dihitung CRC-nya.
+                \item \texttt{count}: jumlah byte dalam array data.
+                \item \texttt{init}: nilai awal untuk inisialisasi CRC.
+                \item \texttt{polinomial}: polinomial yang digunakan untuk perhitungan CRC.
+            \end{itemize}
+
+            \item \textbf{Inisialisasi:} 
+            Nilai CRC diinisialisasi dengan nilai awal yang telah diberikan. Pada SCD41 nilai awal yang digunakan adalah 0x31, maka nilai awal CRC menjadi 0x31.
+        
+            \item \textbf{Cek Urutan Byte:} 
+            Proses ini dimulai dengan memeriksa setiap byte dalam data satu per satu. Untuk setiap byte yang sedang diproses, dilakukan operasi berikut:
+            \begin{itemize}
+                \item Jika urutan byte yang sedang diproses sekarang nilainya lebih kecil daripada jumlah total byte yang akan diproses, maka proses dilanjutkan ke langkah berikutnya.
+                \item Jika tidak, maka perhitungan dihentikan dan nilai CRC yang dihasilkan sejauh ini akan dikembalikan sebagai hasil fungsi.
+            \end{itemize}
+        
+            \item \textbf{XOR Nilai CRC dengan Data:} 
+            Setelah menentukan byte yang akan diproses, nilai CRC saat ini di-XOR dengan nilai byte tersebut. XOR adalah operasi logika yang menggabungkan dua bit berdasarkan aturan tertentu, di mana hasilnya adalah 1 jika kedua bit berbeda dan 0 jika kedua bit sama.
+        
+            \item \textbf{Cek Urutan Bit:} 
+            Selanjutnya, setiap bit dalam byte yang sedang diproses akan diperiksa. Ada 8 bit dalam setiap byte sehingga pemeriksaan dilakukan delapan kali untuk setiap byte.
+        
+            \item \textbf{Geser 1 Bit ke Kiri:} 
+            Pada setiap iterasi bit, jika bit tertinggi (Most Significant Bit, MSB) dari nilai CRC adalah 1, maka CRC akan digeser satu bit ke kiri. Pergeseran ke kiri ini mengakibatkan MSB hilang dan bit baru (0) ditambahkan di bagian paling kanan. 
+        
+            \item \textbf{XOR CRC dengan Polinomial:} 
+            Jika bit tertinggi dari nilai CRC adalah 1 setelah pergeseran, maka nilai CRC tersebut di-XOR dengan nilai polinomial yang telah diberikan. Operasi ini menggabungkan nilai CRC dengan polinomial untuk menghasilkan nilai CRC yang baru. Jika bit tertinggi dari CRC adalah 0, maka nilai CRC hanya digeser satu bit ke kiri tanpa melakukan XOR dengan polinomial.
+        
+            \item \textbf{Kembalikan Nilai CRC:} 
+            Setelah semua byte dan bit dalam data diproses, nilai CRC yang dihitung akan menjadi nilai akhir dan dikembalikan sebagai hasil dari fungsi ini. Nilai ini dapat digunakan sebagai checksum untuk memeriksa integritas data.
+        \end{enumerate}
+        
+        \subsubsection{Pengembangan Fungsi Penentuan Kualitas Udara}
+        Pemilihan standar EN 13779:2007 dalam penelitian ini didasarkan pada beberapa alasan utama yang membedakannya dari standar lain yang disebutkan pada Subbab \ref{dasarTeori}. Pertama, EN 13779:2007 secara khusus membahas kualitas udara dalam ruangan, memberikan panduan rinci mengenai batasan konsentrasi CO2 yang dapat diterima. Fokus ini sangat sesuai dengan tujuan penelitian, yaitu mengembangkan firmware untuk pemantauan kadar CO2 dalam ruangan. Kedua, standar ini mengkategorikan kualitas udara dalam ruangan ke dalam empat tingkat yang jelas (IDA 1 hingga IDA 4) berdasarkan batasan konsentrasi CO2 yang dapat dilihat pada Tabel \ref{tab:en13779}. Kategorisasi yang jelas ini memudahkan penilaian kualitas udara dan penerapannya dalam konteks manajemen bangunan dan sistem HVAC. Ketiga, EN 13779:2007 diakui dan diadopsi secara luas di Eropa, yang mana berarti ada kerangka kerja yang kuat dan terpercaya untuk memastikan kualitas udara dalam ruangan yang baik. Pengakuan luas ini menambah kredibilitas temuan penelitian dan memastikan bahwa\textit{ firmware} yang dikembangkan mematuhi standar yang diakui secara internasional. Keempat, standar ini dirancang khusus untuk lingkungan bangunan non-residensial, yang menjadi fokus penelitian ini, yaitu bangunan UGM. EN 13779:2007 juga menyediakan batas yang spesifik dan dapat diimplementasikan yang sesuai dengan tujuan penelitian, menjadikannya pilihan yang tepat untuk memandu proses penelitian dan pengembangan.
+        
+        \begin{table}[h]
+        \centering
+        \caption{Tingkat CO2 Dalam Ruangan (Diadpatasi dari EN 13779:2007 \cite{EN13779})}
+        \label{tab:en13779}
+        \begin{tabular}{|l|p{3cm}|p{7cm}|}
+        \hline
+        \textbf{Kategori} & \textbf{Tingkat CO2 di atas Tingkat Luar Ruangan} & \textbf{Interpretasi} \\ \hline
+        \textbf{IDA 1} & <= 400 ppm & Cocok untuk ruangan di mana kualitas udara dalam ruangan yang tinggi sangat penting, seperti di rumah sakit. \\ \hline
+        \textbf{IDA 2} & 400 - 600 ppm & Cocok untuk sebagian besar ruang perkantoran umum, toko ritel, dan lingkungan serupa. \\ \hline
+        \textbf{IDA 3} & 600 - 1000 ppm  & Dapat diterima untuk ruangan dengan kebutuhan kualitas udara yang lebih rendah. \\ \hline
+        \textbf{IDA 4} & > 1000 ppm & Tidak direkomendasikan untuk sebagian besar ruangan yang dihuni karena tingkat CO2 yang lebih tinggi dapat mempengaruhi kenyamanan dan produktivitas. \\ \hline
+        \end{tabular}
+        \end{table}
+
+        Standar ini kemudian diimplementasikan pada \textit{firmware} dalam bentuk fungsi seperti yang dapat dilihat pada Gambar \ref{fig:kategori}
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.6\linewidth]{contents//chapter-3/kategori.png}
+            \caption{Diagram Alir Fungsi Penentuan Kualitas Udara}
+            \label{fig:kategori}
+        \end{figure}
+
+        Penjelasan mengenai proses yang ditunjukkan pada Gambar \ref{fig:kategori} untuk fungsi kategorisasi adalah sebagai berikut:
+        
+        \begin{enumerate}
+            \item \textbf{Deklarasi Variabel:} Pada bagian ini, variabel-variabel yang diperlukan untuk menyimpan data CO2, kode error, dan pengukuran suhu dan kelembaban dideklarasikan dan diinisialisasi. Nilai konsentrasi CO2 luar ruangan yang digunakan akan ditentukan berdasarkan hasil pengujian pada bab selanjutnya.
+        
+            \item \textbf{Memanggil Fungsi Pembacaan:} Fungsi \texttt{readMeasurementTicks()} dipanggil untuk membaca data CO2, suhu, dan kelembapan dari sensor. Meskipun data suhu dan kelembapan turut dibaca, data-data tersebut tidak digunakan karena penentuan kategori dari standar yang digunakan hanya memerlukan nilai CO2. 
+            
+            \item \textbf{Penanganan Galat:} Setelah melakukan pembacaan, akan dikembalikan nilai galat yang menunjukkan status komunikasi I2C. (0 berarti sukses, 1 berarti data terlalu panjang untuk dimuat pada \textit{buffer}, 2 berarti menerima bit NACK saat mengirim alamat, 3 berarti menerima bit NACK saat mengirim data, 4 berarti galat lainnya, 5 berarti \textit{timeout}, 6 berarti data yang tersedia lebih sedikit dari \textit{buffer} yang tersedia, 7 berarti nilai CRC yang diterima tidak cocok).
+            
+            \item \textbf{Penentuan Kategori Kualitas Udara:} Setelah memastikan tidak ada kesalahan, dilakukan penentuan kategori kualitas udara berdasarkan nilai CO2 yang terukur terhadap nilai referensi CO2 di luar ruangan. Terdapat empat kategori yang mungkin, dengan rentang nilai CO2 yang berbeda untuk setiap kategori seperti yang telah ditunjukkan pada Tabel \ref{tab:en13779}.
+            
+            \item \textbf{Pengembalian:} Setelah menentukan kategori kualitas udara, fungsi akan mengembalikan \textit{string} yang menjelaskan kategori kualitas udara berdasarkan nilai CO2 yang terukur.
+        \end{enumerate}
+        
+    \subsection{Pengujian}
+    Pada \textit{firmware} yang dirancang, akan dilakukan beberapa pengujian, yaitu: 
+        \begin{enumerate}
+            \item \textbf{Pengujian Perintah - Perintah pada Sensor SCD41:} Pengujian ini bertujuan untuk memastikan semua perintah yang diimplementasikan pada sensor SCD41 berfungsi dengan benar. Fungsi-fungsi program yang dibuat untuk setiap perintah diuji satu per satu, dan respons atau keluaran dari sensor diamati, baik melalui nilai yang dikirim ke komputer maupun gelombang yang diamati dengan \textit{logic analyzer}.
+            
+            \item \textbf{Pengujian Komunikasi I2C antara ESP32 dengan SCD41:} Pengujian ini fokus pada komunikasi I2C antara sensor SCD41 dan board ESP32. Fungsi-fungsi yang dibuat untuk mengirim sinyal I2C dieksekusi, dan kondisi serta kualitas sinyal I2C yang terjadi selama eksekusi dianalisis untuk memastikan komunikasi yang stabil dan akurat.
+            
+            \item \textbf{Pengujian Sensor untuk Mengukur Konsentrasi CO2:} Pengujian ini melibatkan pengukuran konsentrasi CO2 di berbagai lokasi, seperti dalam gedung, area terbuka, dan ruangan khusus lainnya. Setiap lokasi diuji selama periode tertentu untuk mengumpulkan data yang representatif. Program pengujian dijalankan sesuai prosedur yang telah dirancang, dan data yang diperoleh dianalisis untuk memberikan wawasan tentang kualitas udara di lokasi-lokasi tersebut.
+
+        \end{enumerate}
+
+    \subsection{Keterbatasan Penelitian}
+
+    Penelitian ini tentu memiliki tujuan untuk mencapai hasil yang ideal, tetapi dalam praktiknya, terdapat berbagai kendala yang membuat hal ini menjadi sulit dicapai. Meskipun upaya maksimal telah dilakukan, terdapat beberapa keterbatasan yang tidak dapat dihindari. Berikut adalah beberapa keterbatasan yang perlu diperhatikan dalam penelitian ini. 
+    
+    Tingkat akurasi pembacaan sensor terbatas pada spesifikasi yang ada pada \textit{datasheet} sensor SCD41 \cite{scd4x_datasheet}. Setiap sensor memiliki karakteristik dan batasan kinerja yang telah ditentukan oleh pabrik, yang biasanya dijelaskan secara rinci dalam \textit{datasheet}. \textit{Datasheet} ini mencakup informasi tentang rentang pengukuran, ketepatan, resolusi, serta faktor-faktor lain yang mempengaruhi kinerja sensor. Dalam konteks penelitian ini, spesifikasi yang ada pada datasheet SCD41 digunakan sebagai acuan utama untuk menentukan akurasi pembacaan sensor. Oleh karena itu, tingkat akurasi yang diharapkan dari pembacaan CO2 adalah sesuai dengan yang dijelaskan dalam dokumen tersebut tanpa adanya modifikasi atau penyesuaian tambahan.
+
+    Diasumsikan tidak dilakukan proses kalibrasi ulang pada sensor SCD41. Kalibrasi ulang adalah proses penyesuaian kembali sensor untuk memastikan pembacaan yang akurat dan sesuai standar. Proses ini biasanya dilakukan untuk menyesuaikan sensor dengan kondisi lingkungan atau penggunaan tertentu yang mungkin berbeda dari kondisi standar pabrikan. Namun, dalam penelitian ini, diasumsikan bahwa sensor digunakan dalam kondisi yang sudah sesuai dengan spesifikasi datasheet sehingga tidak memerlukan kalibrasi ulang. Asumsi ini didasarkan pada keyakinan bahwa sensor SCD41 sudah cukup akurat untuk keperluan penelitian tanpa memerlukan penyesuaian tambahan.
+    
+    Hasil pembacaan CO2 tidak dibandingkan dengan hasil pembacaan alat ukur yang sudah diakui akurasinya secara internasional. Dalam metode ilmiah, validasi hasil sering dilakukan dengan membandingkan pembacaan dari alat ukur yang diuji dengan alat ukur referensi yang sudah diakui keakuratannya. Alat ukur referensi ini biasanya telah melalui serangkaian kalibrasi dan pengujian yang ketat sehingga dapat dijadikan standar. Namun, dalam penelitian ini, pembacaan CO2 dari sensor SCD41 tidak dibandingkan dengan alat ukur referensi tersebut. Keputusan ini mungkin diambil untuk menyederhanakan prosedur penelitian atau karena keterbatasan akses terhadap alat ukur yang diakui secara internasional. Sebagai hasilnya, tingkat keakuratan sensor sepenuhnya bergantung pada spesifikasi yang ada pada datasheet tanpa ada verifikasi tambahan dari alat ukur eksternal.
+    
+\section{Alur Tugas Akhir}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.25\linewidth]{contents//chapter-3/alur_penelitian.png}
+    \caption{Diagarm Alir Penelitian}
+    \label{fig:alur_penelitian}
+\end{figure}
+
+Dalam melakukan penelitian dan pengembangan \textit{firmware}, penulis telah menyusun alur penelitian. Alur penelitian ini sendiri dirancang setelah melakukan studi literatur. Diagram alur penelitian dapat dilihat pada \ref{fig:alur_penelitian}. Penelitian ini terbagi menjadi beberapa tahapan, yaitu studi literatur, persiapan perangkat, pengembangan \textit{firmware}, pengujian, evaluasi dan analisis, serta penulisan laporan. Tahapan-tahapan ini akan dijelaskan lebih lanjut pada bagian-bagian berikut:
+
+\begin{enumerate}
+    \item \textbf{Studi Literatur} \\
+         Pada tahap awal, penulis melakukan studi literatur untuk memahami berbagai aspek yang relevan dengan penelitian ini. Penulis mempelajari \textit{datasheet} dari sensor SCD41 untuk memahami spesifikasi dan fitur sensor, cara komunikasi dengan mikrokontroler, terutama ESP32, konfigurasi sensor, serta kegunaan setiap perintah yang tersedia. Selain \textit{datasheet}, penulis juga mempelajari dokumentasi lain yang relevan seperti \textit{application notes} dan dokumen - dokumen lainnya untuk memperoleh gambaran yang lebih komprehensif. Penulis juga mempelajari dokumentasi ESP32 secara mendalam untuk memahami cara kerja mikrokontroler tersebut, terutama dalam hal komunikasi I2C yang digunakan oleh sensor SCD41. Selain itu, penulis meninjau penelitian-penelitian sebelumnya yang menggunakan sensor CO2 untuk pemantauan kualitas udara. Penelitian-penelitian tersebut memberikan gambaran mengenai sistem yang akan dikembangkan, termasuk kelebihan yang dapat diadopsi dan kekurangan yang perlu dihindari.
+        
+    \item \textbf{Persiapan Perangkat} \\
+        Setelah memperoleh pemahaman yang cukup melalui studi literatur, penulis mempersiapkan perangkat yang diperlukan untuk penelitian ini. Perangkat utama yang digunakan meliputi sensor SCD41 dan ESP32. Penulis memastikan bahwa semua komponen telah terpasang dengan benar dan terhubung dengan baik untuk meminimalisir kesalahan selama proses pengembangan dan pengujian. Selain itu, penulis juga menyiapkan perangkat lunak pendukung seperti platform pengembangan PlatformIO yang digunakan untuk menulis dan mengunggah firmware ke ESP32.
+
+    \item \textbf{Pengembangan \textit{Firmware}} \\
+        Pada tahap ini, penulis mulai mengembangkan firmware untuk sensor SCD41. Firmware ini dikembangkan dengan tujuan untuk memfasilitasi pemantauan kadar CO2 dalam ruangan. Penulis melakukan berbagai konfigurasi pada sensor SCD41 untuk mengoptimalkan akurasi pembacaan. Selama pengembangan, penulis juga membuat beberapa iterasi untuk memastikan bahwa firmware dapat berkomunikasi dengan baik dengan sensor dan dapat mengirimkan data yang akurat ke sistem monitoring.
+
+    \item \textbf{Pengujian} \\
+        Setelah firmware dikembangkan, penulis melakukan pengujian untuk memastikan bahwa sistem bekerja sesuai dengan yang diharapkan. Pengujian dilakukan di berbagai ruangan di gedung UGM untuk mengukur kadar CO2. Data hasil pengujian dicatat dan dianalisis untuk mengevaluasi kinerja sistem. Penulis juga membandingkan hasil pengukuran dengan standar yang telah ditetapkan.
+
+    \item \textbf{Evaluasi dan Analisis} \\
+        Hasil pengujian dianalisis untuk menilai kinerja sistem pemantauan CO2. Analisis dilakukan untuk menentukan tingkat akurasi dan keandalan dari sistem yang dikembangkan. Penulis juga melakukan evaluasi terhadap hasil pengukuran dengan membandingkannya terhadap standar dan pedoman yang relevan. Evaluasi ini penting untuk memastikan bahwa sistem yang dikembangkan memenuhi persyaratan dan dapat digunakan secara efektif untuk pemantauan kualitas udara di dalam ruangan.
+
+    \item \textbf{Penulisan Laporan} \\
+        Tahap akhir dari penelitian ini adalah penulisan laporan skripsi. Laporan ini mencakup seluruh proses penelitian mulai dari studi literatur, persiapan perangkat, pengembangan firmware, pengujian, hingga evaluasi dan analisis. Penulis menyusun laporan dengan sistematis dan mendokumentasikan setiap langkah dan temuan secara rinci. Laporan ini juga dilengkapi dengan kesimpulan dan rekomendasi untuk pengembangan lebih lanjut.
+
+\end{enumerate}

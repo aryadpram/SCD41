@@ -1,0 +1,83 @@
+\chapter{Pendahuluan}
+
+\section{Latar Belakang}
+    
+    Setiap tahunnya, kekhawatiran mengenai kualitas udara yang memburuk di Indonesia semakin meningkat. Hal ini seiring dengan meningkatnya kesadaran masyarakat akan dampak kesehatan yang ditimbulkan oleh polusi udara \cite{healthconcern} \cite{healthconcern2} \cite{healthconcern3}. Polusi udara, baik di luar maupun di dalam ruangan, telah menjadi perhatian utama karena dampaknya yang serius terhadap kesehatan manusia. Komponen berbahaya di udara, seperti polutan, alergen, dan patogen, memiliki potensi tinggi untuk menimbulkan risiko kesehatan yang signifikan \cite{healthconcern4} \cite{pollutants}. Terutama, infeksi saluran pernapasan akut merupakan salah satu dampak kesehatan yang sering kali dikaitkan dengan kualitas udara yang buruk \cite{respi}. Namun, polusi udara dalam ruangan sering kali terabaikan, padahal dampaknya tidak kalah signifikan dibandingkan polusi luar ruangan. Polusi dalam ruangan dapat berasal dari berbagai sumber, seperti bahan bangunan, perabotan, produk pembersih yang digunakan sehari-hari, dan udara kotor dari luar ruangan \cite{Vardoulakis2020Indoor}.
+    
+    Temuan dari Universitas Chicago menunjukkan bahwa kualitas udara di Indonesia tidak memenuhi standar Organisasi Kesehatan Dunia (WHO), dan hal ini dapat memperpendek harapan hidup sebesar 1,2 tahun \cite{mortal}. Masyarakat yang menghabiskan sekitar 80-90 persen aktivitas harian mereka di dalam ruangan, menghadapi risiko kesehatan yang lebih tinggi akibat polusi dalam ruangan \cite{productivity}. Hal ini menyoroti pentingnya perhatian terhadap kualitas udara dalam ruangan, bukan hanya di luar ruangan. Penurunan produktivitas sebesar lima persen saja dapat merugikan ekonomi hingga 3,2 kuadriliun rupiah per tahun \cite{losses}, menggarisbawahi dampak ekonomi dari polusi udara yang buruk. Peningkatan kesadaran mengenai isu ini memerlukan tindakan yang lebih serius untuk menjaga kualitas udara di lingkungan dalam ruangan \cite{Wargocki2011Productivity}.
+    
+    Dalam konteks ini, konsentrasi karbon dioksida (CO2) menjadi salah satu parameter penting dalam pemantauan kualitas udara dalam ruangan. CO2 merupakan indikator utama untuk mengevaluasi efisiensi ventilasi dan adanya kontaminan udara di dalam ruangan \cite{Persily2022Development}. Ketika konsentrasi CO2 tinggi, ini sering kali menunjukkan bahwa ventilasi tidak memadai, yang dapat mengakibatkan akumulasi polutan berbahaya dan penurunan kualitas udara secara keseluruhan. Oleh karena itu, pemantauan dan pengendalian konsentrasi CO2 merupakan aspek penting dalam menjaga lingkungan dalam ruangan yang sehat \cite{Lowther2021Low}. Dengan pemantauan yang akurat, dapat diidentifikasi masalah ventilasi dan tindakan perbaikan yang diperlukan dapat dilakukan untuk memastikan kualitas udara yang lebih baik.
+    
+    Kemajuan teknologi Internet of Things (IoT) menawarkan solusi yang menjanjikan untuk pemantauan kualitas udara. IoT melibatkan interkoneksi berbagai perangkat dan sensor, memungkinkan mereka untuk berkomunikasi dan berbagi data secara real-time \cite{iot}. Teknologi ini memungkinkan pengumpulan dan analisis data secara efisien, yang sangat berguna dalam pemantauan lingkungan \cite{iot2, iot3, iot4, iot5}. Dalam konteks kualitas udara, sistem IoT dapat mengumpulkan data dari berbagai sensor yang dipasang di dalam ruangan, seperti sensor CO2, suhu, kelembaban, dan polutan lainnya \cite{Marzouk2022Assessment}. Data yang dikumpulkan dapat memberikan informasi yang mendalam mengenai kondisi udara dan membantu dalam pengambilan keputusan yang tepat untuk memperbaiki kualitas udara.
+    
+    Namun, penerapan teknologi IoT dalam pemantauan kualitas udara menghadapi beberapa tantangan. Salah satu tantangan utama adalah memastikan sistem beroperasi secara efisien dan andal di lingkungan nyata. Di sinilah peran firmware menjadi sangat penting \cite{Toma2019IoT}. Firmware adalah perangkat lunak yang berjalan pada mikrokontroler dan bertanggung jawab untuk mengelola interaksi perangkat keras \cite{Sun2023Feature}. Desain firmware yang baik sangat penting untuk memastikan bahwa sistem pemantauan udara berfungsi dengan baik, akurat, dan efisien. Firmware mengelola berbagai fungsi, termasuk pengolahan data dari sensor, komunikasi dengan perangkat lain, dan pengiriman data ke sistem analisis. Oleh karena itu, desain firmware harus mempertimbangkan berbagai faktor seperti kecepatan pemrosesan dan ketahanan terhadap gangguan \cite{Oliveira2023Investigating}.
+    
+    Selain firmware, protokol komunikasi juga memainkan peran penting dalam kinerja sistem IoT. Salah satu protokol yang sering digunakan dalam sistem ini adalah I2C (Inter-Integrated Circuit). Protokol I2C memungkinkan komunikasi yang efisien antara sensor dan mikrokontroler, memudahkan integrasi berbagai perangkat. Protokol ini menggunakan dua jalur utama—SDA (Serial Data Line) dan SCL (Serial Clock Line)—untuk mentransmisikan data dan sinyal clock. I2C memfasilitasi komunikasi antara perangkat dengan cara yang sederhana dan efisien, yang sangat cocok untuk aplikasi pemantauan kualitas udara yang melibatkan banyak sensor. Dengan menggunakan I2C, data dari sensor CO2 dapat dikumpulkan dan dikirim ke mikrokontroler untuk pemrosesan, dan kemudian data tersebut dapat dikirim ke sistem analisis atau platform cloud untuk evaluasi lebih lanjut \cite{nxp}.
+    
+    Penelitian ini bertujuan untuk mengatasi kebutuhan pemantauan CO2 dalam ruangan secara akurat dan real-time.  Oleh karena itu, penggunaan mikrokontroler (MCU) dan firmware dalam sistem IoT dapat menjadi solusi yang tepat. MCU berfungsi sebagai pusat pengendali yang mengelola komunikasi antara sensor, firmware, dan infrastruktur IoT. Firmware yang dirancang khusus untuk pemantauan CO2, bersama dengan protokol I2C, diharapkan dapat meningkatkan efektivitas sistem pemantauan. Sistem ini diharapkan akan memungkinkan pengumpulan dan pengiriman data CO2 secara efisien, memberikan wawasan tentang kondisi udara dalam ruangan dan membantu dalam menjaga kualitas udara.
+    
+    Dalam implementasinya, sistem ini tidak hanya akan memberikan informasi tentang konsentrasi CO2, tetapi juga dapat memberikan data lebih lanjut mengenai kondisi udara secara keseluruhan. Data yang diperoleh dari sensor CO2 dan sensor lainnya akan dianalisis untuk mengidentifikasi masalah potensial, seperti ventilasi yang tidak memadai atau akumulasi polutan. Informasi ini akan digunakan untuk mengambil langkah-langkah perbaikan yang diperlukan untuk memastikan kualitas udara yang lebih baik. Selain itu, data yang dikumpulkan dapat berkontribusi pada pengembangan strategi pengelolaan kualitas udara yang lebih baik dan mendukung praktik bangunan hijau \cite{Marques2020Indoor}.
+    
+    Secara keseluruhan, penelitian ini diharapkan dapat mengembangkan solusi yang efisien dan andal untuk pemantauan kualitas udara dalam ruangan. Dengan memperhatikan desain firmware yang baik dan penggunaan protokol komunikasi seperti I2C secara saksama, sistem ini akan mampu memberikan data yang akurat dan real-time mengenai kualitas udara. Kontribusi ini diharapkan tidak hanya akan meningkatkan kesehatan masyarakat tetapi juga mendukung produktivitas ekonomi yang lebih baik dengan menjaga kualitas udara dalam ruangan yang optimal. Inovasi dalam pemantauan kualitas udara ini juga akan berperan penting dalam praktik bangunan hijau, membantu menciptakan lingkungan yang lebih sehat dan lebih aman bagi masyarakat.
+    
+\section{Rumusan Masalah}
+Dari latar belakang tersebut, maka rumusan masalah dari penelitian ini adalah sebagai berikut:  
+
+\begin{enumerate}
+    \item Dibutuhkannya \textit{firmware} agar \textit{microcontroller} dapat memerintah sensor SCD41 untuk melakukan pengukuran konsentarasi CO2.
+    \item Konsentrasi CO2 perlu dipantau karena dapat berdampak buruk jika sudah melewati standar internasional yang telah ditentukan oleh organisasi yang berwenang.
+    \item Pemantauan CO2 secara \textit{real-time} diperlukan untuk memungkinkan tindakan cepat dalam mengendalikan konsentrasi CO2 di dalam ruangan.
+\end{enumerate}
+
+\section{Tujuan Penelitian}
+Adapun tujuan yang ingin dicapai dari penelitian ini adalah sebagai berikut: 
+
+\begin{enumerate}
+        \item Menganalisis protokol I2C pada sensor CO2, terutama SCD41 (jelasin nanti ketemu findingnya apa, perlu apa aja buat baca gt, findingya tunjukin di kesimpulan). ditambah juga di rumusan masalah juga soalny pengemangbangan firmware i2c perlu memahami sturktur I2C
+	\item Mengembangkan \textit{firmware} untuk pembacaan konsentrasi CO2 di udara dalam ruangan ruangan UGM menggunakan sensor SCD41 pada \textit{platform} ESP32 menggunakan protokol I2C.
+	\item Mengetahui kualitas udara pada bangunan UGM berdasarkan standar internasional yang telah ditentukan oleh organisasi yang berwenang.
+\end{enumerate}
+
+\section{Batasan Penelitian}
+Hal-hal yang menjadi batasan dari penelitian ini adalah sebagai berikut: 
+
+\begin{enumerate}
+    \item Objek penelitian: Studi pengembangan \textit{firmware} sistem \textit{monitoring} konsentrasi CO2 menggunakan sensor SCD41 pada \textit{platform} ESP32.
+    \item Metode penelitian: Penelitian pengembangan firmware  sensor SCD41 pada \textit{platform} ESP32 dan pengujian konsentrasi CO2 berdasarkan standar.
+    \item Waktu dan tempat penelitian: Waktu penelitian adalah Februari-Juni 2024 di UGM Press dan Laboratorium Elektronika Dasar DTETI FT UGM.
+    \item Populasi dan sampel: Populasi adalah udara di lokasi pengujian selama waktu pengukuran dan sampel adalah pembacaan konsentrasi CO2 di udara yang diambil setiap 5 detik.
+    \item Variabel: Variabel bebasnya adalah skenario dan kondisi lokasi pengujian, dan variabel terikatnya adalah tingkat konsentrasi CO2 yang didapat.
+    \item Hipotesis: Bahwa \textit{firmware} yang akan dikembangkan dapat bekerja sesuai spesifikasi \textit{manufacturer} dan kondisi masing-masing lokasi akan memiliki nilai konsentrasi CO2 yang berbeda-beda, tetapi masih sesuai standar internasional.
+    \item Keterbatasan Penelitian: Tingkat akurasi pembacaan sensor terbatas pada  spesifikasi yang ada pada \textit{datasheet} sensor SCD41 sehingga diasumsikan tidak dilakukan proses kalibrasi ulang. Hasil pembacaan CO2 tidak dibandingkan dengan hasil pembacaan alat ukur yang sudah diakui akurasinya secara internasional.
+\end{enumerate}
+
+\newpage
+
+\section{Manfaat Penelitian}
+Penelitian ini harapannya dapat memberikan manfaat sebagai berikut: 
+
+\begin{enumerate}
+    \item Memberikan pemahaman terhadap proses pengembangan \textit{firmware} sensor SCD41 pada \textit{platform} ESP32.
+    \item Menyediakan data dasar mengenai konsentrasi CO2 di bangunan UGM yang dapat digunakan untuk penelitian lanjutan atau penerapan sistem serupa di tempat lain. 
+    \item Meningkatkan kesadaran pihak-pihak terkait sehingga bisa mengambil tindakan yang tepat dan cepat untuk mengendalikan kualitas udara berdasarkan data konsentrasi CO2 yang didapat.
+    \item Berkontribusi pada pengembangan teknologi pemantauan lingkungan yang \textit{customizable}, lebih murah, mudah diakses dengan menggunakan \textit{microcontroller} dan sensor yang tersedia di pasaran. 
+\end{enumerate}
+
+\section{Sistematika Penulisan}
+
+Dalam menyusun skripsi ini, penulis mengikuti pedoman dan struktur yang direkomendasikan oleh Departemen Teknik Elektro dan Teknologi Informasi Fakultas Teknik Universitas Gadjah Mada. Rekomendasi ini diterapkan agar penelitian dapat disampaikan dengan jelas. Sistematis penulisan yang dijelaskan berikut ini merupakan kerangka kerja yang digunakan dalam penelitian.
+
+\noindent \textbf{BAB I Pendahuluan} \\
+Bab ini berisi latar belakang yang menjelaskan konteks dan alasan pentingnya penelitian ini dilakukan. Selain itu, bab ini mencakup motivasi yang mendorong penulis untuk melakukan penelitian, rumusan masalah yang akan dijawab, tujuan yang ingin dicapai, batasan penelitian yang menentukan ruang lingkup penelitian, manfaat penelitian yang menjelaskan kontribusi penelitian, dan sistematika penulisan skripsi yang menggambarkan struktur dari keseluruhan dokumen.
+
+\noindent \textbf{BAB II Tinjauan Pustaka dan Landasan Teori} \\
+Bagian ini mengulas studi literatur terkait, dimulai dengan penelitian serupa yang telah dilakukan oleh orang lain. Penelitian tersebut dianalisis untuk dijadikan bahan evaluasi dan referensi dalam penelitian ini. Landasan teori dijelaskan sebagai kerangka dasar yang mendukung judul penelitian, memberikan pemahaman mendalam mengenai konsep-konsep yang digunakan dalam penelitian.
+
+\noindent \textbf{BAB III Metodologi Penelitian} \\
+Bab ini membahas metodologi penelitian yang mencakup langkah-langkah yang akan diambil untuk mencapai tujuan penelitian. Dimulai dengan alat dan bahan yang akan digunakan selama proses penelitian, metode penelitian yang akan diterapkan, mekanisme pelaksanaan penelitian, serta alur penelitian yang menjelaskan tahapan-tahapan yang akan dilakukan. Selain itu, keterbatasan penelitian juga diuraikan beserta pendekatan yang digunakan untuk mengatasinya.
+
+\noindent \textbf{BAB IV Hasil dan Pembahasan} \\
+Bagian ini menjelaskan hasil dari setiap metode yang digunakan dalam penelitian. Hasil pengujian dan analisis data dipaparkan secara rinci, termasuk interpretasi dari hasil tersebut. Selain itu, hasil penelitian ini dibandingkan dengan penelitian serupa sebelumnya untuk melihat kesamaan dan perbedaannya, serta memahami kontribusi yang diberikan oleh penelitian ini.
+
+\noindent \textbf{BAB V Kesimpulan dan Saran} \\
+Bab penutup ini berisi kesimpulan dari penelitian yang menjawab rumusan masalah dan tujuan yang telah ditetapkan pada bab pendahuluan. Kesimpulan juga mencakup penemuan signifikan lainnya yang diperoleh selama penelitian. Selain itu, saran diberikan untuk penelitian selanjutnya, berdasarkan temuan dan keterbatasan yang dihadapi dalam penelitian ini.

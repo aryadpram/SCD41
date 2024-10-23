@@ -1,0 +1,58 @@
+#include <Arduino.h>
+#include "SensirionI2CScd4x.h"
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin();
+  scd4x.begin(Wire);
+
+  // Start periodic measurement
+  scd4x.startPeriodicMeasurement();
+  delay(5000); // Wait for 5 seconds to get the first measurement
+
+  // Get and print the first measurement
+  bool isDataReady = false;
+  scd4x.getDataReadyFlag(isDataReady);
+
+  if (isDataReady) {
+    uint16_t co2;
+    float temperature, humidity;
+    scd4x.readMeasurement(co2, temperature, humidity);
+    Serial.printf("CO2: %d ppm, Temperature: %.2f °C, Humidity: %.2f %%\n", co2, temperature, humidity);
+  } else {
+    Serial.println("Data not ready.");
+  }
+
+  // Stop periodic measurement before setting the altitude
+  scd4x.stopPeriodicMeasurement();
+  Serial.println("Periodic measurement stopped.");
+
+  // Set altitude to 137 meters
+  scd4x.setSensorAltitude(137);
+  Serial.println("Altitude set to 137 meters.");
+
+  // Restart periodic measurement to get the new measurement
+  scd4x.startPeriodicMeasurement();
+  delay(5000); // Wait for 5 seconds to get the new measurement
+}
+
+void loop() {
+  bool isDataReady = false;
+
+  // Check if data is ready after setting the altitude
+  scd4x.getDataReadyFlag(isDataReady);
+
+  if (isDataReady) {
+    uint16_t co2;
+    float temperature, humidity;
+    scd4x.readMeasurement(co2, temperature, humidity);
+    Serial.printf("New Measurement - CO2: %d ppm, Temperature: %.2f °C, Humidity: %.2f %%\n", co2, temperature, humidity);
+  } else {
+    Serial.println("Data not ready after setting altitude.");
+  }
+
+  delay(2000); // Check every 2 seconds
+}

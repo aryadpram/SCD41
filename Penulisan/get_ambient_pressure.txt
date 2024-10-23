@@ -1,0 +1,44 @@
+#include <Arduino.h>
+#include "SensirionI2CScd4x.h"
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  scd4x.begin(Wire);
+
+  // Stop periodic measurement before setting the pressure
+  uint16_t error = scd4x.stopPeriodicMeasurement();
+  if (error) {
+    Serial.print("Error stopping periodic measurement: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Periodic measurement stopped.");
+  }
+
+  // Set pressure to a valid value within uint16_t range
+  uint16_t pressureToSet = 997; // Example value in hPa
+  error = scd4x.setAmbientPressure(pressureToSet);
+  if (error) {
+    Serial.print("Error setting pressure: ");
+    Serial.println(error);
+  } else {
+    Serial.println("Pressure set successfully.");
+  }
+
+  // Retrieve and print the current pressure
+  uint16_t AmbientPressure; 
+  error = scd4x.getAmbientPressure(AmbientPressure);
+  if (error) {
+    Serial.print("Error retrieving pressure: ");
+    Serial.println(error);
+  } else {
+    Serial.printf("Current Pressure: %d hPa\n", AmbientPressure);
+  }
+}
+
+void loop() {
+  // No continuous actions needed for this example
+  delay(5000); // Delay to prevent continuous printing
+}

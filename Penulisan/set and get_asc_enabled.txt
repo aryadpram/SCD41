@@ -1,0 +1,44 @@
+#include Arduino.h
+#include SensirionI2CScd4x.h
+
+SensirionI2CScd4x scd4x;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  scd4x.begin(Wire);
+
+   Stop periodic measurement before making changes
+  uint16_t error = scd4x.stopPeriodicMeasurement();
+  if (error) {
+    Serial.print(Error stopping periodic measurement );
+    Serial.println(error);
+  } else {
+    Serial.println(Periodic measurement stopped.);
+  }
+
+   Set Automatic Self-Calibration (ASC) to enabled
+  uint16_t ascEnabled = 1;  1 to enable ASC, 0 to disable
+  error = scd4x.setAutomaticSelfCalibration(ascEnabled);
+  if (error) {
+    Serial.print(Error setting ASC );
+    Serial.println(error);
+  } else {
+    Serial.println(Automatic Self-Calibration set successfully.);
+  }
+
+   Retrieve and print the current ASC setting
+  uint16_t currentASC;
+  error = scd4x.getAutomaticSelfCalibration(currentASC);
+  if (error) {
+    Serial.print(Error retrieving ASC );
+    Serial.println(error);
+  } else {
+    Serial.printf(Current Automatic Self-Calibration %sn, currentASC  Enabled  Disabled);
+  }
+}
+
+void loop() {
+   No continuous actions needed for this example
+  delay(10000);  Delay to prevent continuous printing
+}
