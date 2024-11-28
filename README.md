@@ -1,3 +1,5 @@
+*if youre just here for the source code of the library, it's located in **/lib***
+
 # What is this?
 An arduino library for one of Sensirion's CO2 sensor, SCD41
 
